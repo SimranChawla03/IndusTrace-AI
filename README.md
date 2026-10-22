@@ -2,7 +2,7 @@
 
 ### An Uncertainty-Aware Manufacturing Waste Investigation and Resource Recovery Decision Support System
 
-**Live demo:** https://indus-trace-ai-beta.vercel.app/\
+**Live demo:** https://indus-trace-ai-beta.vercel.app/?
 **Repository:** https://github.com/SimranChawla03/IndusTrace-AI
 
 IndusTrace AI helps manufacturing teams organize waste-stream
