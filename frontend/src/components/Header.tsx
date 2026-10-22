@@ -41,7 +41,7 @@ export const Header: React.FC<HeaderProps> = ({ title, subtitle }) => {
         {/* User initials / avatar */}
         <div className="flex items-center gap-2.5 pl-2">
           <div className="w-9 h-9 rounded-full bg-[#E5EEE3] border border-[#C2D8C4] flex items-center justify-center text-[#26734D] font-bold text-[14px] shadow-2xs">
-            {user?.full_name ? user.full_name.split(' ').map(n => n[0]).join('').slice(0, 2) : 'SC'}
+            {user?.full_name ? user.full_name.split(' ').map(n => n[0]).join('').slice(0, 2) : 'IT'}
           </div>
         </div>
       </div>

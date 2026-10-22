@@ -8,8 +8,8 @@ export const SignInPage: React.FC = () => {
   const { login } = useAuth();
   const navigate = useNavigate();
 
-  const [email, setEmail] = useState('simran@abcmfg.com');
-  const [password, setPassword] = useState('password123');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -50,7 +50,7 @@ export const SignInPage: React.FC = () => {
             </Link>
 
             <h2 className="text-[28px] sm:text-[32px] font-bold text-[#202C25] tracking-tight">
-              Welcome Back
+              Welcome to IndusTrace AI
             </h2>
             <p className="text-[14px] sm:text-[15px] text-[#56645A] mt-1.5 mb-6">
               Sign in to your account to continue your sustainability journey.
@@ -89,7 +89,7 @@ export const SignInPage: React.FC = () => {
                     type={showPassword ? 'text' : 'password'}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••••••"
+                    placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
                     required
                     className="w-full px-4 py-3 rounded-xl border border-[#DCE5DA] bg-[#F7F8F3]/60 text-[#202C25] placeholder-[#778279] text-[15px] focus:outline-none focus:ring-2 focus:ring-[#278653] transition pr-11"
                   />
@@ -127,23 +127,9 @@ export const SignInPage: React.FC = () => {
                 {!loading && <ArrowRight className="w-4 h-4" />}
               </button>
             </form>
-
-            <div className="relative my-6 text-center">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-[#DCE5DA]"></div>
-              </div>
-              <span className="relative px-3 bg-[#FFFFFF] text-[12px] text-[#778279] uppercase tracking-wider">
-                Demo Accounts Configured
-              </span>
-            </div>
-
-            <div className="space-y-2 text-[13px] text-[#56645A] bg-[#F0F5EC] p-3.5 rounded-xl border border-[#DCE5DA]">
-              <p><strong>Primary Demo:</strong> simran@abcmfg.com / password123</p>
-              <p><strong>Secondary Demo:</strong> demo@industrace.ai / demo123</p>
-            </div>
           </div>
 
-          <div className="pt-6 border-t border-[#DCE5DA] text-center text-[14px] text-[#56645A]">
+          <div className="mt-8 pt-6 border-t border-[#DCE5DA] text-center text-[14px] text-[#56645A]">
             Don't have an account?{' '}
             <Link to="/create-account" className="font-semibold text-[#26734D] hover:underline">
               Create a new account

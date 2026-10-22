@@ -104,11 +104,7 @@ export const LandingPage: React.FC = () => {
             </div>
 
             {/* Metrics highlight strip */}
-            <div className="pt-8 border-t border-[#DCE5DA] grid grid-cols-2 sm:grid-cols-4 gap-6">
-              <div>
-                <p className="text-[28px] font-bold text-[#202C25] leading-tight">100+</p>
-                <p className="text-[13px] text-[#56645A] mt-0.5 font-medium">Industries Supported</p>
-              </div>
+            <div className="pt-8 border-t border-[#DCE5DA] grid grid-cols-1 sm:grid-cols-3 gap-6">
               <div>
                 <p className="text-[28px] font-bold text-[#26734D] leading-tight">6x</p>
                 <p className="text-[13px] text-[#56645A] mt-0.5 font-medium">Factor Investigation</p>
@@ -317,49 +313,45 @@ export const LandingPage: React.FC = () => {
 
       {/* 6. Scientific & Evidence Standards Section */}
       <section id="evidence" className="py-20 bg-[#F7F8F3] border-b border-[#DCE5DA]">
-        <div className="max-w-[1360px] mx-auto px-6 lg:px-12 grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
-          <div className="lg:col-span-6 space-y-6">
+        <div className="max-w-[1360px] mx-auto px-6 lg:px-12 space-y-10">
+          <div className="max-w-3xl space-y-3">
             <span className="text-[13px] font-semibold text-[#26734D] uppercase tracking-wider">
               Research & Scientific Boundaries
             </span>
             <h2 className="text-[36px] font-bold text-[#202C25] tracking-tight">
               No Fabricated Assumptions. Strict Engineering Guardrails.
             </h2>
-            <div className="space-y-4 text-[15px] text-[#56645A] leading-relaxed">
-              <div className="flex items-start gap-3">
-                <ShieldCheck className="w-5 h-5 text-[#26734D] flex-shrink-0 mt-1" />
-                <p>
-                  <strong>Literature Rules vs Plant Reality:</strong> Reference benchmarks from peer-reviewed publications highlight what to investigate, but never substitute for certified testing of plant samples.
-                </p>
-              </div>
-              <div className="flex items-start gap-3">
-                <ShieldCheck className="w-5 h-5 text-[#26734D] flex-shrink-0 mt-1" />
-                <p>
-                  <strong>Material Compatibility Checks:</strong> The engine automatically flags metallurgical impossibilities (e.g., claiming 30% copper in standard aluminium scrap).
-                </p>
-              </div>
-              <div className="flex items-start gap-3">
-                <ShieldCheck className="w-5 h-5 text-[#26734D] flex-shrink-0 mt-1" />
-                <p>
-                  <strong>Transparent Assumptions:</strong> If recovery is calculated on an unassayed stream, the system mandates an explicit Hypothetical Scenario label.
-                </p>
-              </div>
-            </div>
           </div>
 
-          <div className="lg:col-span-6">
-            <div className="p-8 rounded-3xl bg-[#FFF5DD] border border-[#E8D8A7] space-y-4 shadow-sm">
-              <h3 className="font-bold text-[20px] text-[#8A5A00]">University IDEA Lab Research Standard</h3>
-              <p className="text-[14px] text-[#8A5A00]/90 leading-relaxed">
-                IndusTrace AI was developed under the guidance of Dr. Abhishek Sahu for Semester V, Session 2026–27. 
-                Its decision-support architecture provides advisory pathways and does not constitute statutory environmental clearance.
-              </p>
-              <div className="pt-4 border-t border-[#E8D8A7]/70 text-[13px] text-[#8A5A00] font-medium flex flex-wrap gap-4">
-                <span>Deeya Saoji (Roll 50)</span>
-                <span>Simran Chawla (Roll 28)</span>
-                <span>Shriram Gosavi (Roll 58)</span>
-                <span>Anushree Agrawal (Roll 45)</span>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="p-6 rounded-2xl bg-[#FFFFFF] border border-[#DCE5DA] shadow-xs space-y-3">
+              <div className="w-10 h-10 rounded-xl bg-[#E5EEE3] flex items-center justify-center text-[#26734D]">
+                <ShieldCheck className="w-5 h-5" />
               </div>
+              <h3 className="font-bold text-[17px] text-[#202C25]">Literature Rules vs Plant Reality</h3>
+              <p className="text-[14px] text-[#56645A] leading-relaxed">
+                Reference benchmarks from peer-reviewed publications highlight what to investigate, but never substitute for certified testing of plant samples.
+              </p>
+            </div>
+
+            <div className="p-6 rounded-2xl bg-[#FFFFFF] border border-[#DCE5DA] shadow-xs space-y-3">
+              <div className="w-10 h-10 rounded-xl bg-[#E5EEE3] flex items-center justify-center text-[#26734D]">
+                <ShieldCheck className="w-5 h-5" />
+              </div>
+              <h3 className="font-bold text-[17px] text-[#202C25]">Material Compatibility Checks</h3>
+              <p className="text-[14px] text-[#56645A] leading-relaxed">
+                The engine automatically flags metallurgical impossibilities (e.g., claiming 30% copper in standard aluminium scrap).
+              </p>
+            </div>
+
+            <div className="p-6 rounded-2xl bg-[#FFFFFF] border border-[#DCE5DA] shadow-xs space-y-3">
+              <div className="w-10 h-10 rounded-xl bg-[#E5EEE3] flex items-center justify-center text-[#26734D]">
+                <ShieldCheck className="w-5 h-5" />
+              </div>
+              <h3 className="font-bold text-[17px] text-[#202C25]">Transparent Assumptions</h3>
+              <p className="text-[14px] text-[#56645A] leading-relaxed">
+                If recovery is calculated on an unassayed stream, the system mandates an explicit Hypothetical Scenario label.
+              </p>
             </div>
           </div>
         </div>
@@ -397,7 +389,7 @@ export const LandingPage: React.FC = () => {
           </div>
 
           <p className="text-[13px] text-[#778279]">
-            © 2026–27 IndusTrace AI. Engineering Decision Support System • IDEA Lab
+            © 2026–27 IndusTrace AI. Engineering Decision Support System
           </p>
 
           <div className="flex items-center gap-6 text-[13px]">
