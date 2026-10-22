@@ -1,0 +1,7 @@
+Factor,Weight_Percent,Status,Implementation_Note
+Quantity,20,Prototype assumption,Define and normalize scale consistently.
+Frequency,15,Prototype assumption,Map categories to a documented scale.
+Information_Gap,25,Prototype assumption,Missing decision-critical data may increase test priority.
+Recovery_Potential,20,Prototype assumption,Must be evidence-based; don't infer from stream name alone.
+Evidence_Confidence,10,Prototype assumption,Reflect source quality/applicability.
+Economic_Relevance,10,Prototype assumption,"If prices/costs are missing, mark unknown."

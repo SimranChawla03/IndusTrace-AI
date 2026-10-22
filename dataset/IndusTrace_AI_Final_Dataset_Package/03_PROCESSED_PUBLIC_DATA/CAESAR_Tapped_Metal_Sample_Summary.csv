@@ -1,0 +1,10 @@
+﻿source_sheet,scrap_grade,scrap_status,sample_id,metal_yield_as_reported,sample_representativeness_as_reported,source_note
+Tapped metal - chem. analysis,E3,primarily treated,p-E3,0.9216075415529644,1,Experimental melting characterization; not company-wide or plant-arrival data.
+Tapped metal - chem. analysis,E1,primarily treated,p-E1,0.9066820276497696,0.6477000672494957,Experimental melting characterization; not company-wide or plant-arrival data.
+Tapped metal - chem. analysis,E40,cleaned,cE40 RS-HS,0.8808677262999909,0.9511204583363551,Experimental melting characterization; not company-wide or plant-arrival data.
+Tapped metal - chem. analysis,E40,cleaned,cE40 RS-LS,0.8909264307848258,0.8783855679535161,Experimental melting characterization; not company-wide or plant-arrival data.
+Tapped metal - chem. analysis,WEEE (motors),primarily treated,p-WEEE-1 M1,0.9446410364061656,0.9931695887854178,Experimental melting characterization; not company-wide or plant-arrival data.
+Tapped metal - chem. analysis,WEEE (motors),cleaned,c-WEEE-1 M2<30,0.9222820492517221,0.9967109092451665,Experimental melting characterization; not company-wide or plant-arrival data.
+Tapped metal - chem. analysis,WEEE (motors),cleaned,c-WEEE-1 M2>30,0.9277886497064578,0.9997065211011328,Experimental melting characterization; not company-wide or plant-arrival data.
+Tapped metal - chem. analysis,E40,raw,E40-1Y,0.8978010417468503,0.7356871458011334,Experimental melting characterization; not company-wide or plant-arrival data.
+Tapped metal - chem. analysis,E40,cleaned,c-E40 M1,0.9176668337707528,0.9887,Experimental melting characterization; not company-wide or plant-arrival data.

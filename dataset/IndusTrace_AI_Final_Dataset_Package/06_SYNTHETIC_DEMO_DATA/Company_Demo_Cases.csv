@@ -1,0 +1,6 @@
+Case_ID,Company_Name,Industry,Process,Waste_Stream,Quantity,Quantity_Unit,Frequency,Current_Handling,Known_Composition_or_Contamination,Lab_Result_Available,Data_Origin
+DEMO001,Example Fabrication Pvt Ltd,Metal fabrication,CNC machining,Steel machining chips,120,kg/week,Daily,Sold as scrap,Unknown,False,SYNTHETIC_DEMO
+DEMO002,Example Auto Components Ltd,Automotive components,Aluminium machining,Aluminium machining chips,65,kg/week,Daily,Stored for pickup,Coolant residue unknown,False,SYNTHETIC_DEMO
+DEMO003,Example Plating Works,Electroplating,Copper plating wastewater treatment,Copper-bearing electroplating sludge,18,kg/week,Weekly,Sent for treatment,Copper content unknown,False,SYNTHETIC_DEMO
+DEMO004,Example Plating Works,Electroplating,Mixed-metal plating,Mixed-metal electroplating sludge,25,kg/week,Weekly,Authorized handler,Metal profile unavailable,False,SYNTHETIC_DEMO
+DEMO005,Example Machine Shop,Machining,CNC machining,Aluminium machining chips,90,kg/week,Daily,Mixed with scrap,Alloy grade unknown,False,SYNTHETIC_DEMO

@@ -1,0 +1,13 @@
+Field,Data_Type,Requirement,Used_In,Validation_or_Trust_Rule
+Company_Name,string,Required,Company form,Company-provided; not verified
+Industry,string,Required,Company form,User-provided
+Process,string,Required,Company form,User-provided
+Waste_Stream,string,Required,Company form,Match to WIR
+Quantity,number,Recommended,Company form,Must include unit
+Quantity_Unit,string,Required with quantity,Company form,Do not mix units without conversion
+Frequency,string,Recommended,Company form,Daily/weekly/monthly etc.
+Current_Handling,string,Recommended,Company form,User-provided
+Known_Composition,string,Optional,Company form,Unverified unless source/lab report attached
+Contamination_Info,string,Optional,Company form,Unknown is allowed
+Lab_Result_Available,boolean,Required,Company form,"If true, attach sample/report"
+Data_Origin,string,Required in storage,System,COMPANY_INPUT/PUBLIC_DATA/SYNTHETIC_DEMO/LAB_RESULT

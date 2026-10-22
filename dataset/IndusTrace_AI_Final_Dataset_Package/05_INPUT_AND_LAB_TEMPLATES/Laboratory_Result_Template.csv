@@ -1,0 +1,4 @@
+Lab_Record_ID,Case_ID,Waste_Stream,Parameter,Result_As_Reported,Unit,Test_Method,Test_Date,Data_Origin,Notes
+LAB-DEMO-001,DEMO003,Copper-bearing electroplating sludge,Cu,NOT_ENTERED,wt%,NOT_TESTED,,SYNTHETIC_TEMPLATE,Placeholder only; replace with real lab report.
+LAB-DEMO-002,DEMO003,Copper-bearing electroplating sludge,Ni,NOT_ENTERED,wt%,NOT_TESTED,,SYNTHETIC_TEMPLATE,Placeholder only; replace with real lab report.
+LAB-DEMO-003,DEMO005,Aluminium machining chips,Al,NOT_ENTERED,wt%,NOT_TESTED,,SYNTHETIC_TEMPLATE,Do not infer composition; enter only reported measurement.

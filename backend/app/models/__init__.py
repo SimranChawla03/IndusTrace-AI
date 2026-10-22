@@ -1,0 +1,48 @@
+# backend/app/models/__init__.py
+from .entities import (
+    Company,
+    WasteStream,
+    WIRRule,
+    ResearchSource,
+    LabResult,
+    TestAssessment,
+    RecoveryScenario,
+)
+from .schemas import (
+    CompanyCreate,
+    CompanyResponse,
+    WasteStreamCreate,
+    WasteStreamUpdate,
+    WasteStreamResponse,
+    LabResultCreate,
+    LabResultResponse,
+    WIRRuleResponse,
+    ResearchSourceResponse,
+    AssessmentResponse,
+    RecoveryCalculationRequest,
+    RecoveryScenarioResponse,
+    DashboardSummary,
+)
+
+__all__ = [
+    "Company",
+    "WasteStream",
+    "WIRRule",
+    "ResearchSource",
+    "LabResult",
+    "TestAssessment",
+    "RecoveryScenario",
+    "CompanyCreate",
+    "CompanyResponse",
+    "WasteStreamCreate",
+    "WasteStreamUpdate",
+    "WasteStreamResponse",
+    "LabResultCreate",
+    "LabResultResponse",
+    "WIRRuleResponse",
+    "ResearchSourceResponse",
+    "AssessmentResponse",
+    "RecoveryCalculationRequest",
+    "RecoveryScenarioResponse",
+    "DashboardSummary",
+]

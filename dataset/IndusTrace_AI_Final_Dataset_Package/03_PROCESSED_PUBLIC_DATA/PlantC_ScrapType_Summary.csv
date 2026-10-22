@@ -1,0 +1,16 @@
+ScrapType,record_count,unique_suppliers,total_recorded_weight,mean_recorded_weight,median_recorded_weight,total_recorded_soil,total_recorded_water,total_recorded_other,data_source,weight_unit
+ST05,3,1,69240,23080.0,25340.0,650,0,0,Plant C public scrap-arrival dataset,Not verified in source metadata; retain source units
+ST12,1,1,22840,22840.0,22840.0,400,0,0,Plant C public scrap-arrival dataset,Not verified in source metadata; retain source units
+ST17,2876,95,78745980,27380.38247566064,23420.0,1145670,19,239890,Plant C public scrap-arrival dataset,Not verified in source metadata; retain source units
+ST18,1025,60,25636460,25011.18048780488,24220.0,414740,0,12610,Plant C public scrap-arrival dataset,Not verified in source metadata; retain source units
+ST19,1830,27,61205800,33445.79234972678,25300.0,518910,0,50150,Plant C public scrap-arrival dataset,Not verified in source metadata; retain source units
+ST20,1347,60,36297620,26947.008166295473,24240.0,221890,0,34360,Plant C public scrap-arrival dataset,Not verified in source metadata; retain source units
+ST21,1186,65,30654340,25846.829679595277,23700.0,1134420,0,105520,Plant C public scrap-arrival dataset,Not verified in source metadata; retain source units
+ST22,543,26,12675880,23344.1620626151,23520.0,84750,0,4700,Plant C public scrap-arrival dataset,Not verified in source metadata; retain source units
+ST23,216,15,5144260,23816.01851851852,24870.0,27060,0,900,Plant C public scrap-arrival dataset,Not verified in source metadata; retain source units
+ST24,31,9,878130,28326.774193548386,23800.0,12280,0,1000,Plant C public scrap-arrival dataset,Not verified in source metadata; retain source units
+ST25,30,11,1003100,33436.666666666664,24520.0,13200,0,2800,Plant C public scrap-arrival dataset,Not verified in source metadata; retain source units
+ST26,2,1,60510,30255.0,30255.0,0,0,0,Plant C public scrap-arrival dataset,Not verified in source metadata; retain source units
+ST27,307,57,9708500,31623.778501628665,24020.0,143720,0,41330,Plant C public scrap-arrival dataset,Not verified in source metadata; retain source units
+ST28,1,1,24760,24760.0,24760.0,200,0,0,Plant C public scrap-arrival dataset,Not verified in source metadata; retain source units
+ST29,1,1,24160,24160.0,24160.0,400,0,0,Plant C public scrap-arrival dataset,Not verified in source metadata; retain source units

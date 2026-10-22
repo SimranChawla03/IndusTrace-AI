@@ -1,0 +1,7 @@
+EntryMonth,arrival_records,distinct_suppliers,distinct_scrap_codes,total_recorded_weight,mean_recorded_weight,data_source,weight_unit
+2024-01,1275,97,9,33827730,26531.55294117647,Plant C public scrap-arrival dataset,Not verified in source metadata; retain source units
+2024-02,1760,103,8,50655370,28781.460227272728,Plant C public scrap-arrival dataset,Not verified in source metadata; retain source units
+2024-03,1703,106,8,47612930,27958.26776277158,Plant C public scrap-arrival dataset,Not verified in source metadata; retain source units
+2024-04,1481,96,7,40093220,27071.721809588114,Plant C public scrap-arrival dataset,Not verified in source metadata; retain source units
+2024-05,1455,102,9,41925610,28814.852233676975,Plant C public scrap-arrival dataset,Not verified in source metadata; retain source units
+2024-06,1725,106,12,48036720,27847.373913043477,Plant C public scrap-arrival dataset,Not verified in source metadata; retain source units

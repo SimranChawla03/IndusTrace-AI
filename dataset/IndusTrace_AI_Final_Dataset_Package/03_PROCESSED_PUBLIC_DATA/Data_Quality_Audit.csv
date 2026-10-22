@@ -1,0 +1,10 @@
+File,Audit_Metric,Value,Interpretation
+PlantC_Scrap_Arrivals_Raw.csv,Rows,9399,Public dataset source file; preserved source fields
+PlantC_Scrap_Arrivals_Raw.csv,Columns,11,Original source columns
+PlantC_Scrap_Arrivals_Raw.csv,Duplicate full rows,0,Exact duplicates assessed across original fields
+PlantC_Scrap_Arrivals_Raw.csv,Missing cells in original fields,0,No imputation performed
+PlantC_Scrap_Arrivals_Raw.csv,Distinct suppliers,130,"Supplier codes, not verified company identities"
+PlantC_Scrap_Arrivals_Raw.csv,Distinct scrap codes,15,ScrapType codes are not mapped to material names without source codebook
+PlantC_Scrap_Arrivals_Raw.csv,Records with parseable entry dates,9399,Derived from source date field
+PlantC_Scrap_Arrivals_Raw.csv,Records with reported Difference matching timestamps (seconds tolerance),9399,Only a data consistency check; not a physical process performance metric
+PlantC_Scrap_Arrivals_Raw.csv,Weight unit,UNVERIFIED,Do not label as kg or tonnes until verified in source metadata
