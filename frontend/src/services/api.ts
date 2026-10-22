@@ -1,3 +1,4 @@
+/// <reference types="vite/client" />
 // frontend/src/services/api.ts
 const API_BASE = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '') + '/api';
 
