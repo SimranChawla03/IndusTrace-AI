@@ -1,192 +1,330 @@
-# IndusTrace AI: Uncertainty-Aware Manufacturing Waste Investigation & Resource Recovery Decision Support System
+# IndusTrace AI
 
-A University IDEA Lab Project for **Semester V, Session 2026–27**.
+### An Uncertainty-Aware Manufacturing Waste Investigation and Resource Recovery Decision Support System
 
-### Team Members
-- **Deeya Saoji** — Roll No. 50 — Section A3_B4
-- **Simran Chawla** — Roll No. 28 — Section A3_B2
-- **Shriram Gosavi** — Roll No. 58 — Section A3_B4
-- **Anushree Agrawal** — Roll No. 45 — Section A3_B3
-- **Project Guide:** Dr. Abhishek Sahu
+**Live demo:** https://indus-trace-ai-beta.vercel.app/\
+**Repository:** https://github.com/SimranChawla03/IndusTrace-AI
 
----
+IndusTrace AI helps manufacturing teams organize waste-stream
+information, identify critical data gaps, prioritize further
+investigation, and explore potential resource-recovery scenarios. It is
+a decision-support prototype---not a replacement for laboratory
+analysis, process engineers, environmental specialists, or regulatory
+guidance.
 
-## 1. Project Overview & Core Novelty
+## Table of Contents
 
-Industrial manufacturing produces heterogeneous, uncharacterized waste streams (e.g., precision machining swarf, electroplating sludges, metallurgical dross, solvent residues). Investigating every stream involves costly laboratory assays, logistics, and engineering hours.
+-   [Problem](#problem)
+-   [Solution](#solution)
+-   [Key Features](#key-features)
+-   [How It Works](#how-it-works)
+-   [Technology Stack](#technology-stack)
+-   [Project Structure](#project-structure)
+-   [Getting Started](#getting-started)
+-   [Environment Configuration](#environment-configuration)
+-   [Deployment](#deployment)
+-   [Data and Evidence Limitations](#data-and-evidence-limitations)
+-   [Current Scope](#current-scope)
+-   [Team](#team)
 
-**The Core Problem:** Prioritizing waste investigations **under incomplete information**, rather than merely matching known scrap with recycling dealers.
+## Problem
 
-**IndusTrace AI** is an explainable decision-support system that:
-1. Registers manufacturing facilities and waste streams while explicitly flagging unknown data.
-2. Compares waste streams against a **Waste Intelligence Repository (WIR)** seeded with research literature.
-3. Computes a transparent, reproducible **Test Worthiness Score (TWS)** on a 0–100 scale using 6 prototype weights.
-4. Ranks streams by investigation priority to determine which waste stream should be sent to the lab first.
-5. Ingests certified laboratory results while preserving reported analytical qualifiers (`<0.030`, `ND`, `bal.`).
-6. Automatically recalculates TWS and missing-information gaps when laboratory results are entered.
-7. Computes mass-balance recovery quantities and net economics when valid assay fractions are provided, preventing gross revenue from posing as net profit.
-8. Generates explainable, rule-based recommendations with attached literature citations and known limitations.
-9. Exports genuine, professional PDF reports for executive, technical, and strategic decision pathways.
+Manufacturing facilities can generate waste streams whose composition,
+handling requirements, and recovery potential are not fully documented.
+Decisions made with incomplete information can lead to missed recovery
+opportunities, unnecessary testing, or unsuitable handling choices.
 
----
+## Solution
 
-## 2. Mandatory Scientific & Engineering Boundaries
+IndusTrace AI provides a structured workflow to:
 
-- **No Composition Hallucinations:** The system does not infer exact chemical composition or metal concentrations from textual descriptions alone.
-- **Process Matching is Screening Only:** A process match indicates a *candidate* characteristic, not proof of composition.
-- **Data Source Boundaries:** Public arrival/logistics data (Plant C Zenodo 17633305) and public experimental melts (CAESAR Zenodo 15737122) are kept strictly separate from company plant records.
-- **Transparent Prototype Weights:** TWS factor weights are documented prototype engineering assumptions configured in `TWS_Prototype_Config.csv`.
-- **Decision-Support Guardrail:** Outputs are decision-support aids, not regulatory clearance certificates or hazardous waste disposal approvals.
+1.  Record companies, facilities, and waste streams.
+2.  Identify missing or uncertain information.
+3.  Use a rule-based Waste Investigation Rules (WIR) knowledge base and
+    evidence records to inform investigation.
+4.  Calculate a **Test Worthiness Score (TWS)** to help prioritize which
+    waste streams may need further testing.
+5.  Record laboratory results when they become available.
+6.  Explore theoretical material quantities and potential recovery
+    scenarios using explicit assumptions and available data.
+7.  Present recommendations with supporting evidence, missing
+    information, and limitations.
 
----
+## Key Features
 
-## 3. Technology Stack & Security Architecture
+-   **Company and facility records** --- organize facility and
+    manufacturing-process information.
+-   **Waste-stream management** --- capture waste category, generating
+    process, quantity, frequency, known characteristics, and current
+    handling.
+-   **Evidence-aware investigation** --- connect investigation rules and
+    research sources to the questions that need answering.
+-   **Missing-information checks** --- highlight information gaps that
+    may affect assessment.
+-   **Test Worthiness Score (TWS)** --- provide a weighted, rule-based
+    prioritization score.
+-   **Laboratory-result records** --- store measured parameters, values,
+    units, methods, and sample details.
+-   **Recovery scenario analysis** --- estimate theoretical and
+    potentially recovered quantities from entered composition fractions,
+    recovery assumptions, and available economic inputs.
+-   **Dashboards and assessments** --- summarize waste streams,
+    investigation status, priorities, and activity.
+-   **PDF reports** --- generate supported report types from the
+    application.
+-   **Role-aware workflows** --- support company-level workflows and
+    platform-owner governance features implemented in the application.
+-   **Dataset summaries** --- expose summaries and selected sample data
+    from supported datasets.
 
-- **Frontend:** React 18, Vite, TypeScript, Tailwind CSS, Recharts, Lucide React, React Router v6.
-- **Backend:** Python 3.13, FastAPI, SQLAlchemy 2.0, SQLite (local file in `backend/data/industrace.db`), Pydantic v2, Pandas, NumPy, ReportLab.
-- **Security & Multi-Tenant Isolation:**
-  - Password Hashing: Industry-standard **Bcrypt** with random salt (`$2b$`).
-  - Session Management: Cryptographically signed **HMAC-SHA256 JWT tokens** with 72-hour expiry.
-  - Strict Authorization: No fallback to default company/user; every data route verifies authenticated company ownership.
-  - Cross-Tenant Enforcement: Returns 403 Forbidden on attempts to query, update, delete, or export data belonging to another tenant.
-- **Testing:** Pytest with FastAPI TestClient running against an **isolated test database** (`test_industrace_isolated.db`) so production data is protected.
+> Feature availability and outputs depend on the data entered,
+> configured rules, and the current prototype implementation.
 
----
+## How It Works
 
-## 4. Folder Structure
+1.  **Enter waste-stream information.** Record the manufacturing
+    process, waste quantity, generation frequency, known
+    characteristics, and current handling.
+2.  **Review information gaps.** The system checks available fields and
+    applies relevant investigation rules.
+3.  **Prioritize investigation.** A TWS is calculated from weighted
+    factors to help compare investigation priorities.
+4.  **Gather evidence.** Review linked research and evidence records,
+    including their scope and limitations.
+5.  **Add laboratory results.** Use actual lab measurements when
+    available to improve the basis for composition and recovery
+    analysis.
+6.  **Explore recovery scenarios.** Calculate estimates from the
+    supplied values and clearly stated assumptions.
+7.  **Review recommendations.** Use the suggested next steps as decision
+    support for further investigation.
 
-```text
+### Test Worthiness Score
+
+The current prototype uses a configurable weighted scoring approach. The
+default factor weights are:
+
+  Factor                    Weight
+  --------------------- ----------
+  Information Gap              25%
+  Quantity                     20%
+  Recovery Potential           20%
+  Frequency                    15%
+  Evidence Confidence          10%
+  Economic Relevance           10%
+  **Total**               **100%**
+
+These weights are prototype assumptions, not scientifically validated or
+industry-certified coefficients. They should be calibrated and validated
+before being used for operational decisions.
+
+## Technology Stack
+
+  Layer           Technologies
+  --------------- -------------------------------------------------
+  Frontend        React, TypeScript, Vite, Tailwind CSS, Recharts
+  Backend         Python, FastAPI
+  Data access     SQLAlchemy
+  Database        SQLite for the current prototype
+  Data analysis   Pandas, NumPy
+  API             REST endpoints served by FastAPI
+
+## Project Structure
+
+``` text
 IndusTrace-AI/
-├── frontend/                     # React + Vite + TypeScript application
-│   ├── public/images/            # Curated local industrial photography assets
-│   ├── src/
-│   │   ├── components/           # Sidebar, Header, ScientificNotice
-│   │   ├── context/              # AuthContext (multi-tenant JWT sessions)
-│   │   ├── pages/                # 11 Reference panels & Dedicated Research Console
-│   │   ├── services/             # API client with full TypeScript interfaces
-│   │   ├── App.tsx               # Client router
-│   │   └── main.tsx              # Application entrypoint
-│   └── package.json
-├── backend/                      # FastAPI Python application
-│   ├── app/
-│   │   ├── database/             # SQLite connection and session management
-│   │   ├── models/               # SQLAlchemy ORM entities & Pydantic schemas
-│   │   ├── services/             # Data loading, CAESAR ingestion, ReportLab PDF generators
-│   │   ├── decision_engine/      # Transparent matcher, TWS scorer, recommender
-│   │   ├── recovery/             # Mass balance and economic calculator
-│   │   └── main.py               # API routes, JWT auth, and CORS configuration
-│   ├── data/                     # Local SQLite database location (industrace.db)
-│   └── requirements.txt
-├── dataset/                      # Extracted dataset package & raw Zenodo records
-├── docs/                         # Architecture diagrams and research methodology
-├── tests/                        # Pytest suite with isolated test DB fixture
+├── backend/       # FastAPI application and backend logic
+├── dataset/       # Dataset package, templates, and evidence/data resources
+├── docs/          # Project documentation
+├── frontend/      # React + TypeScript + Vite application
+├── tests/         # Project tests
+├── .env.example   # Example environment configuration
+├── .gitignore
 └── README.md
 ```
 
----
+## Getting Started
 
-## 5. How to Run IndusTrace AI Locally on Windows
+### Prerequisites
 
-Follow these steps using two separate Command Prompt (CMD) or PowerShell terminals.
+-   Python version compatible with `backend/requirements.txt`
+-   Node.js and npm
+-   Git
 
-### Terminal 1 — Backend (FastAPI)
+### 1. Clone the repository
 
-```powershell
-cd C:\Users\VICTUS\Desktop\IndusTrace-AI
+``` bash
+git clone https://github.com/SimranChawla03/IndusTrace-AI.git
+cd IndusTrace-AI
+```
 
-# 1. Install backend dependencies (if not already installed)
-pip install -r backend\requirements.txt
+### 2. Configure and run the backend
 
-# 2. Run the FastAPI backend server
+Create a local environment file using `.env.example` as a reference. Set
+required secrets locally; **never commit real secrets or passwords**.
+
+Create and activate a virtual environment:
+
+``` bash
+python -m venv .venv
+```
+
+**Windows (Command Prompt):**
+
+``` cmd
+.venv\Scripts\activate
+```
+
+**macOS/Linux:**
+
+``` bash
+source .venv/bin/activate
+```
+
+Install dependencies and start the API from the repository root:
+
+``` bash
+pip install -r backend/requirements.txt
 python -m uvicorn app.main:app --app-dir backend --host 127.0.0.1 --port 8000 --reload
 ```
-*API docs accessible at:* `http://127.0.0.1:8000/docs`
-*Health Check endpoint:* `http://127.0.0.1:8000/api/health`
 
-### Terminal 2 — Frontend (Vite + React)
+Local health endpoint:
 
-```powershell
-cd C:\Users\VICTUS\Desktop\IndusTrace-AI\frontend
+``` text
+http://127.0.0.1:8000/api/health
+```
 
-# 1. Install npm packages (if not already installed)
+Interactive API documentation may be available at
+`http://127.0.0.1:8000/docs`, depending on backend configuration.
+
+### 3. Run the frontend
+
+Open a second terminal:
+
+``` bash
+cd frontend
 npm install
-
-# 2. Start the Vite development server
 npm run dev
 ```
-*Web application accessible at:* `http://localhost:5173`
 
----
+Vite will print the local frontend URL, commonly
+`http://localhost:5173`.
 
-## 6. How to Run Backend Tests & Verify Build
+### 4. Connect the frontend to the backend
 
-### Run Pytest Suite (13/13 passing on isolated test DB)
-```powershell
-cd C:\Users\VICTUS\Desktop\IndusTrace-AI
-python -m pytest tests\test_backend.py -v
-```
-*All 13 tests pass:*
-1. `test_health_check` — Project metadata & guide verification.
-2. `test_auth_and_tamper_protection` — Rejection of unauthenticated / tampered tokens (401).
-3. `test_company_registration_and_login_lifecycle` — 3-step registration & bcrypt login.
-4. `test_waste_stream_persistence_and_deletion` — Full stream persistence & cascade deletion.
-5. `test_wir_matching_relevance` — Keyword & category alignment against literature.
-6. `test_tws_scoring_and_factor_breakdown` — 6-factor normalization summing to 100%.
-7. `test_laboratory_assay_lifecycle_and_assessment_recalculation` — Qualifier preservation & automated assessment update.
-8. `test_unit_normalization_and_recovery_economics` — Mass-balance formula accuracy.
-9. `test_missing_data_recovery_guardrail` — Prevention of phantom profits when costs/quantities missing.
-10. `test_dynamic_tws_config_loader` — CSV loader validation and fallback.
-11. `test_recovery_analysis_linked_assay_validation` — Assay linkage enforcement and material compatibility check.
-12. `test_multi_tenant_company_isolation` — Cross-tenant isolation (Tenant A cannot see or manipulate Tenant B's streams).
-13. `test_pdf_report_generation_and_tenant_security` — Genuine ReportLab PDF generation and download delivery.
+The frontend reads the API base URL from `VITE_API_URL`. For local
+development, create `frontend/.env.local` with:
 
-### Run Frontend Production Build Check (0 errors)
-```powershell
-cd C:\Users\VICTUS\Desktop\IndusTrace-AI\frontend
-npm run build
+``` env
+VITE_API_URL=http://127.0.0.1:8000
 ```
 
----
+The frontend appends `/api` to this base URL. Do not add `/api` to
+`VITE_API_URL` itself.
 
-## 7. Seminar Demonstration Script (October 24, 2026)
+Vite environment variables are embedded into the frontend at build time.
+Restart the development server after changing them.
 
-To demonstrate the full end-to-end platform during the seminar presentation:
+## Environment Configuration
 
-1. **Open Landing Page (`/`):**
-   - Review problem statement: Investigating heterogeneous manufacturing waste under incomplete information.
-   - Show research grounding, team details, and design theme (sage-green & off-white).
+The root `.env.example` is a starting point, not necessarily a complete
+list of all required settings. The backend requires a strong
+`JWT_SECRET` and may use `PLATFORM_OWNER_PASSWORD` and
+`DEMO_USER_PASSWORD` to provision initial accounts. Configure these
+locally or through your hosting provider's environment-variable
+settings.
 
-2. **Login or Register (`/signin` or `/create-account`):**
-   - Use default demo credentials:
-     - **Email:** `simran@abcmfg.com`
-     - **Password:** `password123`
-   - Or register a new company via the 3-step wizard (Company Details $\rightarrow$ Admin Account $\rightarrow$ Review & Launch).
+Example non-secret settings:
 
-3. **Dashboard & Facilities (`/app/dashboard` & `/app/facilities`):**
-   - Inspect facility cards and real-time metrics computed strictly from DB queries.
-   - Add a facility and register a new waste stream with quantity, frequency, and estimated handling costs.
+``` env
+PORT=8000
+HOST=127.0.0.1
+DATABASE_URL=sqlite:///backend/data/industrace.db
+ENVIRONMENT=development
+```
 
-4. **Investigation Priority & TWS Scoring (`/app/investigation`):**
-   - View the circular TWS gauge and the 6-factor horizontal bars.
-   - Review transparent factor contributions and the explainable decision recommendation.
+Use unique, strong values for all secrets. Never put real credentials in
+source code, screenshots, commits, or this README. Changing
+initial-account password environment variables does not necessarily
+change passwords for accounts that already exist in the database.
 
-5. **Laboratory Assays (`/app/laboratory`):**
-   - Record an accredited laboratory assay (e.g. Optical Emission Spectroscopy, Zn 5.62 wt%).
-   - Preserves analytical qualifiers (`<0.030`, `ND`, `bal.`).
-   - Notice how the TWS and information gaps update automatically upon saving the assay.
+## Deployment
 
-6. **Recovery & Economic Analysis (`/app/recovery`):**
-   - Mode A (Confirmed Assay): Computes mass-balance yield linked to the verified assay.
-   - Mode B (Hypothetical Exploration): Explicitly labeled as a hypothetical scenario for planning.
-   - Notice that if operational processing costs are unrecorded, gross material value is not presented as profit.
+The current demo is deployed as two services:
 
-7. **Generate & Download Genuine PDF Reports (`/app/recommendations`):**
-   - Click "Executive Summary (PDF)", "Technical Report (PDF)", or "Recommendations (PDF)".
-   - Real, styled PDF files are generated on the server and downloaded directly to browser Downloads.
+-   **Frontend (Vercel):** https://indus-trace-ai-beta.vercel.app/
+-   **Backend (Render):** https://industrace-ai-backend.onrender.com
 
-8. **Research Intelligence & Provenance Console (`/console`):**
-   - Internal console showing the **Waste Intelligence Repository (WIR)** literature citations and the **Data Provenance Register** tracking Zenodo datasets without cluttering customer operational navigation.
+The frontend's production environment variable is:
 
-9. **Multi-Tenant Security Proof:**
-   - Log out, log in as another company or create a second tenant.
-   - Demonstrate that Tenant A's private streams, facilities, assays, and PDF reports are completely invisible to Tenant B.
+``` env
+VITE_API_URL=https://industrace-ai-backend.onrender.com
+```
+
+Backend health endpoint:
+
+https://industrace-ai-backend.onrender.com/api/health
+
+### Demo deployment notes
+
+-   A free Render service may sleep when inactive, so the first request
+    after inactivity can be slower.
+-   The current backend uses SQLite. Free hosting without a persistent
+    disk should not be treated as durable production storage; database
+    contents may be lost on restarts or redeployments.
+-   Before using the application for ongoing or real company data,
+    configure durable database storage, production-appropriate CORS
+    settings, backups, and secure secret management.
+-   Do not upload confidential industrial data to the public demo unless
+    the deployment has been reviewed and approved for that use.
+
+## Data and Evidence Limitations
+
+The project package contains different kinds of information that must
+not be treated as interchangeable:
+
+-   **Waste Investigation Rules and research records** provide
+    investigation guidance and evidence references; they do not prove
+    the composition of a specific company's waste.
+-   **Plant C logistics data** describes logistics-related information
+    and should not be treated as laboratory chemistry results.
+-   **CAESAR experimental chemistry samples** are experimental sample
+    data, not new assays for a user's facility.
+-   **Synthetic demo cases** are illustrative examples and must remain
+    labelled as synthetic.
+-   **Company-entered information and laboratory results** should be
+    distinguished from reference datasets and assumptions.
+
+The application cannot determine exact waste composition merely from a
+process description. Reliable composition claims require suitable
+sampling and laboratory analysis. Recovery estimates depend on input
+quality, composition fractions, recovery-rate assumptions, costs, and
+prices.
+
+## Current Scope
+
+IndusTrace AI is a prototype decision-support system. Its TWS is
+rule-based and weighted; it is **not currently a trained
+machine-learning model**. Scores and recovery scenarios are estimates
+for investigation support, not guarantees of material recovery,
+profitability, regulatory compliance, or environmental impact.
+
+Use outputs to guide further review with qualified engineers, accredited
+laboratories, environmental professionals, and licensed waste or
+recovery providers. Validate assumptions and applicable regulations
+before acting on recommendations.
+
+## Team
+
+-   Deeya Saoji --- Roll No. 50, A3_B4
+-   Simran Chawla --- Roll No. 28, A3_B2
+-   Shriram Gosavi --- Roll No. 58, A3_B4
+-   Anushree Agrawal --- Roll No. 45, A3_B3
+
+**Project Guide:** Dr. Abhishek Sahu\
+**Academic Session:** Semester V, 2026--27
+
+------------------------------------------------------------------------
+
+*IndusTrace AI --- investigate uncertainty, prioritize evidence, and
+make more informed resource-recovery decisions.*
