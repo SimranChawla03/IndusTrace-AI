@@ -2,7 +2,7 @@
 import os
 import pandas as pd
 from sqlalchemy.orm import Session
-from app.models.entities import WIRRule, ResearchSource, Company, WasteStream, LabResult
+from app.models.entities import WIRRule, ResearchSource, Company, Facility, WasteStream, LabResult
 
 DATASET_ROOT = os.path.abspath(
     os.path.join(
@@ -76,6 +76,71 @@ def load_wir_rules(db: Session) -> int:
     db.commit()
     return count
 
+def seed_demo_company_streams(db: Session) -> int:
+    """Seeds baseline demo waste streams for Company 1 (ABC Manufacturing) if empty."""
+    co = db.query(Company).filter(Company.id == 1).first()
+    if not co:
+        return 0
+    
+    stream_count = db.query(WasteStream).filter(WasteStream.company_id == 1).count()
+    if stream_count > 0:
+        return 0
+
+    fac_cnc = db.query(Facility).filter(Facility.company_id == 1, Facility.name.ilike("%CNC%")).first()
+    fac_surface = db.query(Facility).filter(Facility.company_id == 1, Facility.name.ilike("%Surface%")).first()
+    fac_main = db.query(Facility).filter(Facility.company_id == 1, Facility.name.ilike("%Main%")).first()
+
+    demo_streams = [
+        WasteStream(
+            company_id=1,
+            facility_id=fac_cnc.id if fac_cnc else None,
+            stream_name="Aluminium 7075 Machining Chips",
+            waste_category="Machining Chips",
+            generating_process="Precision 5-Axis CNC Milling",
+            quantity=250.0,
+            quantity_unit="kg/week",
+            frequency="Weekly",
+            current_handling="Collected in bins and sold to secondary scrap merchant",
+            known_characteristics="Aluminium alloy 7075 with ~4% residual water-soluble coolant",
+            estimated_handling_cost=12000.0,
+            recovery_info="High potential for closed-loop briquetting or remelt",
+            data_origin="SYNTHETIC_DEMO"
+        ),
+        WasteStream(
+            company_id=1,
+            facility_id=fac_surface.id if fac_surface else None,
+            stream_name="Copper-Bearing Electroplating Sludge",
+            waste_category="Sludge",
+            generating_process="Acid Copper Plating Bath Rinse Neutralization",
+            quantity=45.0,
+            quantity_unit="kg/week",
+            frequency="Weekly",
+            current_handling="Dewatered in filter press and stored in hazardous containment",
+            known_characteristics="Neutralized hydroxide cake, estimated 15-25% Cu dry basis",
+            estimated_handling_cost=24000.0,
+            recovery_info="Candidate for hydrometallurgical leaching",
+            data_origin="SYNTHETIC_DEMO"
+        ),
+        WasteStream(
+            company_id=1,
+            facility_id=fac_main.id if fac_main else None,
+            stream_name="Mild Steel Stamping Skeleton Scrap",
+            waste_category="Metal Scrap",
+            generating_process="Hydraulic Press Blanking & Forging",
+            quantity=1.8,
+            quantity_unit="tonnes/month",
+            frequency="Monthly",
+            current_handling="Baled and collected by regional steel recycler",
+            known_characteristics="Clean low-carbon steel strip, minimal oil",
+            estimated_handling_cost=8000.0,
+            recovery_info="Direct electric arc furnace feed",
+            data_origin="SYNTHETIC_DEMO"
+        )
+    ]
+    db.add_all(demo_streams)
+    db.commit()
+    return len(demo_streams)
+
 def load_synthetic_demo_cases(db: Session) -> int:
     csv_path = get_dataset_path("06_SYNTHETIC_DEMO_DATA", "Company_Demo_Cases.csv")
     if not os.path.exists(csv_path):
@@ -109,7 +174,6 @@ def load_synthetic_demo_cases(db: Session) -> int:
         ).first()
 
         if not stream:
-            # Parse quantity
             qty_raw = row.get("Quantity")
             qty = float(qty_raw) if pd.notna(qty_raw) else None
 
@@ -157,7 +221,6 @@ def load_caesar_reference_chemistry(db: Session, max_rows: int = 100) -> int:
         try:
             val_num = float(val_str)
         except ValueError:
-            # Preserves qualifiers such as '<0.005', '0.012-0.016', etc.
             val_num = None
         
         existing = db.query(LabResult).filter(
@@ -185,11 +248,20 @@ def load_caesar_reference_chemistry(db: Session, max_rows: int = 100) -> int:
     db.commit()
     return count
 
-def init_db_with_datasets(db: Session):
+def init_db_with_datasets(db: Session, seed_demo: bool = True):
+    """
+    Initializes public scientific reference datasets and optionally loads synthetic demo data.
+    Preserves all existing records. Never overwrites or deletes existing data.
+    """
     sources_count = load_research_sources(db)
     wir_count = load_wir_rules(db)
-    demo_count = load_synthetic_demo_cases(db)
     caesar_count = load_caesar_reference_chemistry(db)
+    
+    demo_count = 0
+    if seed_demo:
+        demo_count = load_synthetic_demo_cases(db)
+        seed_demo_company_streams(db)
+        
     return {
         "research_sources_loaded": sources_count,
         "wir_rules_loaded": wir_count,

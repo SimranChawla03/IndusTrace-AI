@@ -55,13 +55,13 @@ export const CreateAccountPage: React.FC = () => {
     try {
       setLoading(true);
       await registerCompany({
-        company_name: formData.company_name,
+        company_name: formData.company_name.trim(),
         industry: formData.industry,
         company_size: formData.company_size,
-        location: formData.location,
-        manufacturing_process: formData.manufacturing_process,
-        full_name: formData.full_name,
-        email: formData.email,
+        location: formData.location.trim(),
+        manufacturing_process: formData.manufacturing_process.trim(),
+        full_name: formData.full_name.trim(),
+        email: formData.email.trim().toLowerCase(),
         password: formData.password
       });
       navigate('/app/dashboard');

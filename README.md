@@ -265,13 +265,26 @@ Backend health endpoint:
 
 https://industrace-ai-backend.onrender.com/api/health
 
-### Demo deployment notes
+### Demo deployment notes & Render Persistent Disk Configuration
 
 -   A free Render service may sleep when inactive, so the first request
     after inactivity can be slower.
--   The current backend uses SQLite. Free hosting without a persistent
-    disk should not be treated as durable production storage; database
-    contents may be lost on restarts or redeployments.
+-   **Persistent Storage on Render (SQLite):**
+    By default, Render Web Services run in ephemeral containers that wipe local disk changes on every restart, redeployment, or spin-down. To maintain SQLite data durability on Render:
+    1. In the Render Dashboard, add a **Persistent Disk** to the backend Web Service.
+    2. Set the **Mount Path** to `/var/data` (e.g., 1 GB size).
+    3. In the Render Environment settings, configure:
+       ``` env
+       DATABASE_URL=sqlite:////var/data/industrace.db
+       ```
+    4. The backend automatically ensures `/var/data` exists and persists `industrace.db` across all redeployments.
+    > **Warning:** Do not claim live data is persistent unless a persistent disk is attached. Without a persistent disk, all registrations and database updates will be lost when Render cycles instances.
+-   **Owner Account Recovery Utility:**
+    If Platform Owner credentials are lost or need to be reset in production without printing passwords to logs or terminals, run the headless recovery utility:
+    ``` bash
+    python -m app.services.auth_recovery owner@industrace.ai
+    ```
+    In automated environments, pass the `RECOVERY_PASSWORD` environment variable securely.
 -   Before using the application for ongoing or real company data,
     configure durable database storage, production-appropriate CORS
     settings, backups, and secure secret management.

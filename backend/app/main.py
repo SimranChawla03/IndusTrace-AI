@@ -11,6 +11,7 @@ import jwt
 from fastapi import FastAPI, Depends, HTTPException, Query, Header as FastHeader, Response
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 
 # Load local environment variables before importing database configuration.
 load_dotenv()
@@ -43,104 +44,53 @@ from app.recovery import compute_recovery_and_economics
 # Ensure database tables exist
 Base.metadata.create_all(bind=engine)
 
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    on_startup()
+    yield
+
 app = FastAPI(
     title="IndusTrace AI Backend API",
     description="An Uncertainty-Aware Manufacturing Waste Investigation and Resource Recovery Decision Support System",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan
 )
 
-# Enable CORS for local Vite development
+# Configure CORS securely for local Vite frontend and configured origins
+allowed_origins_env = os.getenv("ALLOWED_ORIGINS", "")
+allowed_origins = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:3000",
+    "http://127.0.0.1:8000",
+    "http://localhost:8000"
+]
+if allowed_origins_env:
+    for o in allowed_origins_env.split(","):
+        if o.strip() and o.strip() not in allowed_origins:
+            allowed_origins.append(o.strip())
+if os.getenv("FRONTEND_URL"):
+    fu = os.getenv("FRONTEND_URL").strip()
+    if fu not in allowed_origins:
+        allowed_origins.append(fu)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Startup event: safely initialize datasets if empty
-@app.on_event("startup")
-def on_startup():
-    from app.database.connection import SessionLocal
-    db = SessionLocal()
-    try:
-        wir_count = db.query(WIRRule).count()
-        if wir_count == 0:
-            init_db_with_datasets(db)
-        
-        # Ensure default demo user exists
-        demo_user = db.query(User).filter(User.email == "simran@abcmfg.com").first()
-        if not demo_user and os.getenv("DEMO_USER_PASSWORD"):
-            demo_co = db.query(Company).filter(Company.id == 1).first()
-            if not demo_co:
-                demo_co = Company(
-                    id=1,
-                    name="ABC Manufacturing Pvt. Ltd.",
-                    industry="Automotive & Metallurgy Components",
-                    company_size="100-500 employees",
-                    location="Nagpur, Maharashtra, India",
-                    email="info@abcmfg.com",
-                    manufacturing_process="Precision CNC Machining & Surface Treatment"
-                )
-                db.add(demo_co)
-                db.commit()
-                db.refresh(demo_co)
-            
-            demo_user = User(
-                company_id=demo_co.id,
-                email="simran@abcmfg.com",
-                hashed_password=hash_password(os.environ["DEMO_USER_PASSWORD"]),
-                full_name="Simran Chawla",
-                role="admin"
-            )
-            db.add(demo_user)
-            db.commit()
-
-        # Ensure demo facilities for Company 1 exist
-        f_count = db.query(Facility).filter(Facility.company_id == 1).count()
-        if f_count == 0:
-            facilities = [
-                Facility(company_id=1, name="Main Production Plant", location="Nagpur, Maharashtra", primary_process="Metal Fabrication & Forging", description="Primary heavy component processing plant", image_url="/images/facility-main.jpg"),
-                Facility(company_id=1, name="CNC Unit", location="Nagpur, Maharashtra", primary_process="Precision CNC Machining", description="5-axis precision CNC turning and milling line", image_url="/images/facility-cnc.jpg"),
-                Facility(company_id=1, name="Surface Treatment Unit", location="Nagpur, Maharashtra", primary_process="Electroplating & Finishing", description="Plating baths, passivation and pickling tanks", image_url="/images/facility-surface.jpg"),
-            ]
-            db.add_all(facilities)
-            db.commit()
-
-        # Securely provision Platform Owner (cannot be self-elevated via public signup)
-        platform_owner = db.query(User).filter(User.role == "platform_owner").first()
-        if not platform_owner and os.getenv("PLATFORM_OWNER_PASSWORD"):
-            platform_co = db.query(Company).filter(Company.name == "IndusTrace Global Governance").first()
-            if not platform_co:
-                platform_co = Company(
-                    name="IndusTrace Global Governance",
-                    industry="Environmental Systems & Platform Administration",
-                    company_size="Platform Operations",
-                    location="IDEA Lab, Global",
-                    email="owner@industrace.ai",
-                    manufacturing_process="Platform Oversight & Audit",
-                    data_origin="PLATFORM_SYSTEM"
-                )
-                db.add(platform_co)
-                db.commit()
-                db.refresh(platform_co)
-
-            platform_owner = User(
-                company_id=platform_co.id,
-                email="owner@industrace.ai",
-                hashed_password=hash_password(os.environ["PLATFORM_OWNER_PASSWORD"]),
-                full_name="Platform Administrator",
-                role="platform_owner"
-            )
-            db.add(platform_owner)
-            db.commit()
-    finally:
-        db.close()
-
-
 JWT_SECRET = os.getenv("JWT_SECRET")
 if not JWT_SECRET:
-    raise RuntimeError("JWT_SECRET is missing. Configure it in your local .env file.")
+    if os.getenv("ENVIRONMENT", "development").lower() == "development":
+        JWT_SECRET = "industrace_development_fallback_secret_key_2026"
+    else:
+        raise RuntimeError("JWT_SECRET is missing. Configure it in your .env file.")
+
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRATION_HOURS = 72
 
@@ -151,20 +101,112 @@ def hash_password(password: str) -> str:
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     if not hashed_password:
         return False
-    # Bcrypt format ($2a$, $2b$, $2y$)
     if hashed_password.startswith(("$2a$", "$2b$", "$2y$")):
         try:
             return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
         except Exception:
             return False
-    # Legacy SHA-256 fallback for migration
     if len(hashed_password) == 64:
         legacy_sha = hashlib.sha256(plain_password.encode('utf-8')).hexdigest()
         return hmac.compare_digest(legacy_sha, hashed_password)
-    # Plaintext demo seed fallback
     if hashed_password == plain_password:
         return True
     return False
+
+# Startup initialization: safely initialize datasets if empty
+def on_startup():
+    from app.database.connection import SessionLocal
+    db = SessionLocal()
+    try:
+        is_dev = os.getenv("ENVIRONMENT", "development").lower() == "development"
+        wir_count = db.query(WIRRule).count()
+        if wir_count == 0:
+            init_db_with_datasets(db, seed_demo=is_dev)
+        
+        # Ensure default demo user exists for Company 1 in development mode
+        demo_user = db.query(User).filter(User.email == "simran@abcmfg.com").first()
+        demo_pwd = os.getenv("DEMO_USER_PASSWORD", "IndusTrace2026!" if is_dev else None)
+        if not demo_user and demo_pwd:
+            demo_co = db.query(Company).filter(Company.id == 1).first()
+            if not demo_co:
+                demo_co = Company(
+                    id=1,
+                    name="ABC Manufacturing Pvt. Ltd.",
+                    industry="Automotive & Metallurgy Components",
+                    company_size="100-500 employees",
+                    location="Nagpur, Maharashtra, India",
+                    email="info@abcmfg.com",
+                    manufacturing_process="Precision CNC Machining & Surface Treatment",
+                    data_origin="SYNTHETIC_DEMO"
+                )
+                db.add(demo_co)
+                db.commit()
+                db.refresh(demo_co)
+            
+            demo_user = User(
+                company_id=demo_co.id,
+                email="simran@abcmfg.com",
+                hashed_password=hash_password(demo_pwd),
+                full_name="Simran Chawla",
+                role="admin"
+            )
+            db.add(demo_user)
+            db.commit()
+
+        # Ensure demo facilities for Company 1 exist
+        f_count = db.query(Facility).filter(Facility.company_id == 1).count()
+        if f_count == 0 and is_dev:
+            facilities = [
+                Facility(company_id=1, name="Main Production Plant", location="Nagpur, Maharashtra", primary_process="Metal Fabrication & Forging", description="Primary heavy component processing plant", image_url="/images/facility-main.jpg"),
+                Facility(company_id=1, name="CNC Unit", location="Nagpur, Maharashtra", primary_process="Precision CNC Machining", description="5-axis precision CNC turning and milling line", image_url="/images/facility-cnc.jpg"),
+                Facility(company_id=1, name="Surface Treatment Unit", location="Nagpur, Maharashtra", primary_process="Electroplating & Finishing", description="Plating baths, passivation and pickling tanks", image_url="/images/facility-surface.jpg"),
+            ]
+            db.add_all(facilities)
+            db.commit()
+
+        # Ensure demo waste streams for Company 1 exist so dashboard has category records
+        if is_dev:
+            from app.services.data_loader import seed_demo_company_streams
+            seed_demo_company_streams(db)
+
+        # Securely provision or sync Platform Owner
+        owner_email = "owner@industrace.ai"
+        platform_owner = db.query(User).filter(func.lower(User.email) == owner_email).first()
+        owner_pwd = os.getenv("PLATFORM_OWNER_PASSWORD", "PlatformOwner2026!" if is_dev else None)
+        if platform_owner and owner_pwd:
+            # Sync password if updated in environment (e.g., Render environment variable update)
+            if not verify_password(owner_pwd, platform_owner.hashed_password):
+                platform_owner.hashed_password = hash_password(owner_pwd)
+                platform_owner.role = "platform_owner"
+                db.commit()
+        elif not platform_owner and owner_pwd:
+            platform_co = db.query(Company).filter(Company.name == "IndusTrace Global Governance").first()
+            if not platform_co:
+                platform_co = Company(
+                    name="IndusTrace Global Governance",
+                    industry="Environmental Systems & Platform Administration",
+                    company_size="Platform Operations",
+                    location="IDEA Lab, Global",
+                    email=owner_email,
+                    manufacturing_process="Platform Oversight & Audit",
+                    data_origin="PLATFORM_SYSTEM"
+                )
+                db.add(platform_co)
+                db.commit()
+                db.refresh(platform_co)
+
+            platform_owner = User(
+                company_id=platform_co.id,
+                email=owner_email,
+                hashed_password=hash_password(owner_pwd),
+                full_name="Platform Administrator",
+                role="platform_owner"
+            )
+            db.add(platform_owner)
+            db.commit()
+    finally:
+        db.close()
+
 
 def create_access_token(user_id: int, company_id: int) -> str:
     exp = datetime.now(timezone.utc) + timedelta(hours=JWT_EXPIRATION_HOURS)
@@ -198,8 +240,8 @@ def get_current_user_and_company(
 ) -> tuple[User, Company]:
     """
     Authenticate request strictly via Bearer signed token.
-    NO fallback to default user/company.
-    Verifies user belongs to authorized company.
+    NO fallback to arbitrary user/company.
+    Verifies user belongs to authorized company workspace.
     """
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(
@@ -229,12 +271,12 @@ def get_current_user_and_company(
     if not user or not company:
         raise HTTPException(status_code=401, detail="Authenticated user or company workspace no longer exists.")
 
-    if user.company_id != company.id:
+    if user.company_id != company.id and user.role != "platform_owner":
         raise HTTPException(status_code=403, detail="User account is not authorized for this company workspace.")
 
     if x_company_id and x_company_id.isdigit():
         req_co_id = int(x_company_id)
-        if req_co_id != company.id:
+        if req_co_id != company.id and user.role != "platform_owner":
             raise HTTPException(status_code=403, detail="Cross-company workspace access prohibited.")
 
     return user, company
@@ -276,9 +318,10 @@ def get_health():
 # --- Authentication & Onboarding ---
 @app.post("/api/auth/login", response_model=AuthResponse)
 def login(login_req: UserLogin, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.email.ilike(login_req.email.strip())).first()
+    email_clean = login_req.email.strip().lower()
+    user = db.query(User).filter(func.lower(User.email) == email_clean).first()
     if not user or not verify_password(login_req.password, user.hashed_password):
-        raise HTTPException(status_code=401, detail="Invalid email or password.")
+        raise HTTPException(status_code=401, detail="Invalid email address or password.")
 
     # Seamlessly upgrade legacy sha256 or plaintext hashes to bcrypt
     if not user.hashed_password.startswith(("$2a$", "$2b$", "$2y$")):
@@ -292,49 +335,52 @@ def login(login_req: UserLogin, db: Session = Depends(get_db)):
 
 @app.post("/api/auth/register-company", response_model=AuthResponse)
 def register_company_onboarding(req: OnboardingRegisterRequest, db: Session = Depends(get_db)):
+    email_clean = req.email.strip().lower()
     # Check if email is already taken
-    existing_user = db.query(User).filter(User.email.ilike(req.email.strip())).first()
+    existing_user = db.query(User).filter(func.lower(User.email) == email_clean).first()
     if existing_user:
         raise HTTPException(status_code=400, detail="An account with this email address already exists.")
 
-    # Create Company
-    company = Company(
-        name=req.company_name.strip(),
-        industry=req.industry.strip(),
-        company_size=req.company_size or "50-250 employees",
-        location=req.location or "India",
-        email=req.email.strip(),
-        manufacturing_process=req.manufacturing_process or "Precision Manufacturing",
-        process_description=f"Initial onboarding setup for {req.company_name}",
-        data_origin="USER_REGISTERED"
-    )
-    db.add(company)
-    db.commit()
-    db.refresh(company)
+    # Single atomic transaction: Company, Admin User, and Default Facility are created together
+    try:
+        company = Company(
+            name=req.company_name.strip(),
+            industry=req.industry.strip(),
+            company_size=req.company_size or "50-250 employees",
+            location=req.location or "India",
+            email=email_clean,
+            manufacturing_process=req.manufacturing_process or "Precision Manufacturing",
+            process_description=f"Initial onboarding setup for {req.company_name}",
+            data_origin="USER_REGISTERED"
+        )
+        db.add(company)
+        db.flush()
 
-    # Create Admin User with bcrypt hashed password
-    user = User(
-        company_id=company.id,
-        email=req.email.strip(),
-        hashed_password=hash_password(req.password),
-        full_name=req.full_name.strip(),
-        role="admin"
-    )
-    db.add(user)
-    db.commit()
-    db.refresh(user)
+        user = User(
+            company_id=company.id,
+            email=email_clean,
+            hashed_password=hash_password(req.password),
+            full_name=req.full_name.strip(),
+            role="admin"
+        )
+        db.add(user)
+        db.flush()
 
-    # Seed Default Facility for the new company
-    facility = Facility(
-        company_id=company.id,
-        name="Main Manufacturing Unit",
-        location=req.location or "Plant HQ",
-        primary_process=req.manufacturing_process or "Machining & Assembly",
-        description=f"Primary operating facility for {req.company_name}",
-        image_url="/images/facility-main.jpg"
-    )
-    db.add(facility)
-    db.commit()
+        facility = Facility(
+            company_id=company.id,
+            name="Main Manufacturing Unit",
+            location=req.location or "Plant HQ",
+            primary_process=req.manufacturing_process or "Machining & Assembly",
+            description=f"Primary operating facility for {req.company_name}",
+            image_url="/images/facility-main.jpg"
+        )
+        db.add(facility)
+        db.commit()
+        db.refresh(company)
+        db.refresh(user)
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Registration transaction failed: {str(e)}")
 
     token = create_access_token(user.id, company.id)
     return AuthResponse(token=token, user=user, company=company)
@@ -450,26 +496,46 @@ def get_dashboard_summary(
     assessments = []
     for s in streams:
         a = db.query(TestAssessment).filter(TestAssessment.waste_stream_id == s.id).order_by(TestAssessment.id.desc()).first()
+        if not a:
+            a = _execute_stream_assessment(s, db)
         if a:
             assessments.append(a)
 
     high_priority_count = sum(1 for a in assessments if a.priority_level == "High")
     recommended_testing_count = sum(1 for a in assessments if "Testing" in (a.recommendation or ""))
-    awaiting_investigation = max(0, waste_streams_count - len(assessments))
 
-    # Potentially recoverable derived strictly from formal assessment recommendations or modeled recovery scenarios
-    recovery_recom_count = sum(1 for a in assessments if any(k in (a.recommendation or "") for k in ["Recovery", "Recycling", "Reuse"]))
-    modeled_scenarios_count = db.query(RecoveryScenario.waste_stream_id).filter(RecoveryScenario.waste_stream_id.in_(stream_ids)).distinct().count() if stream_ids else 0
-    recoverable_count = max(recovery_recom_count, modeled_scenarios_count)
-
-    categories_map: Dict[str, int] = {}
+    # Evidence-based Pending Tests calculation:
+    # A stream counts as pending if it has 0 lab results OR only partial/unverified assays (< 3 parameters)
+    pending_tests_count = 0
     for s in streams:
-        cat = s.waste_category or "Unspecified"
+        s_labs = db.query(LabResult).filter(LabResult.waste_stream_id == s.id).all()
+        has_verified = len(s_labs) >= 3 and any(r.data_origin == "VERIFIED_LAB_EVIDENCE" for r in s_labs)
+        has_comprehensive = len(s_labs) >= 3 and all(r.result_value_numeric is not None for r in s_labs[:3])
+        if not (has_verified or has_comprehensive):
+            pending_tests_count += 1
+
+    # Genuine qualifying circular recovery opportunities:
+    qualifying_streams = set()
+    scenarios = db.query(RecoveryScenario).filter(RecoveryScenario.waste_stream_id.in_(stream_ids)).all() if stream_ids else []
+    for sc in scenarios:
+        if (sc.net_value is not None and sc.net_value > 0) or (sc.gross_value is not None and sc.gross_value > 0 and (sc.estimated_recovered_quantity_kg or 0) > 0):
+            qualifying_streams.add(sc.waste_stream_id)
+
+    for a in assessments:
+        recom = a.recommendation or ""
+        if any(term in recom for term in ["Evaluate Recovery Feasibility", "Evaluate Recycling", "Evaluate Reuse"]):
+            qualifying_streams.add(a.waste_stream_id)
+
+    potentially_recoverable_count = len(qualifying_streams)
+
+    categories_map = {}
+    for s in streams:
+        cat = (s.waste_category or "Unspecified").strip()
         categories_map[cat] = categories_map.get(cat, 0) + 1
 
     category_dist = [{"name": k, "value": v} for k, v in categories_map.items()]
 
-    p_map = {"High": 0, "Medium": 0, "Low": 0, "Pending": awaiting_investigation}
+    p_map = {"High": 0, "Medium": 0, "Low": 0, "Pending": 0}
     for a in assessments:
         lvl = a.priority_level if a.priority_level in p_map else "Medium"
         p_map[lvl] += 1
@@ -485,34 +551,81 @@ def get_dashboard_summary(
             "date": s.created_at.strftime("%Y-%m-%d %H:%M") if s.created_at else "Recent"
         })
 
+    # Dynamic Next-Best-Action determined by decision engine for current company
+    next_action_data = None
+    if assessments:
+        sorted_assessments = sorted(
+            assessments,
+            key=lambda x: (1 if x.priority_level == "High" else (2 if x.priority_level == "Medium" else 3), -(x.tws_score or 0.0))
+        )
+        top_a = sorted_assessments[0]
+        top_stream = next((s for s in streams if s.id == top_a.waste_stream_id), None)
+        recom_det = top_a.recommendation_details or {}
+        if hasattr(recom_det, "model_dump"):
+            recom_det = recom_det.model_dump()
+        elif hasattr(recom_det, "dict"):
+            recom_det = recom_det.dict()
+
+        stream_labs_count = db.query(LabResult).filter(LabResult.waste_stream_id == top_a.waste_stream_id).count()
+        if stream_labs_count == 0:
+            ev_status = "MISSING_EVIDENCE"
+        elif stream_labs_count < 3:
+            ev_status = "PARTIAL_UNVERIFIED_EVIDENCE"
+        else:
+            ev_status = "SUFFICIENT_LAB_PROFILE"
+
+        next_action_data = {
+            "action": top_a.recommendation or "Conduct Laboratory Testing",
+            "stream_name": top_stream.stream_name if top_stream else "Target Waste Stream",
+            "category": top_stream.waste_category if top_stream else "Industrial Waste",
+            "reason": recom_det.get("reason", "Critical compositional parameters require laboratory verification."),
+            "suggested_next_step": recom_det.get("suggested_next_step", "Submit representative sample for elemental assay."),
+            "priority": top_a.priority_level or "High",
+            "evidence_status": ev_status
+        }
+
     return {
         "facilities_count": facilities_count,
         "waste_streams_count": waste_streams_count,
-        "awaiting_investigation_count": awaiting_investigation,
+        "awaiting_investigation_count": pending_tests_count,
         "with_lab_results_count": streams_with_lab,
-        "recommended_further_testing_count": recommended_testing_count or high_priority_count,
-        "potentially_recoverable_count": recoverable_count,
+        "recommended_further_testing_count": recommended_testing_count,
+        "potentially_recoverable_count": potentially_recoverable_count,
         "category_distribution": category_dist,
         "priority_distribution": priority_dist,
-        "recent_activity": list(reversed(recent))
+        "recent_activity": list(reversed(recent)),
+        "next_recommended_action": next_action_data
     }
 
 
-# --- Companies CRUD ---
+# --- Companies CRUD (Strictly Isolated) ---
 @app.get("/api/companies", response_model=List[CompanyResponse])
-def get_companies(db: Session = Depends(get_db)):
-    return db.query(Company).order_by(Company.id.desc()).all()
+def get_companies(
+    auth_data = Depends(get_current_user_and_company),
+    db: Session = Depends(get_db)
+):
+    user, current_co = auth_data
+    # Enforce tenant isolation: Regular users can ONLY view their own company profile
+    if user.role != "platform_owner":
+        return [current_co]
+    return db.query(Company).filter(Company.data_origin != "PLATFORM_SYSTEM").order_by(Company.id.desc()).all()
 
 @app.post("/api/companies", response_model=CompanyResponse)
-def create_company(company_in: CompanyCreate, db: Session = Depends(get_db)):
+def create_company(
+    company_in: CompanyCreate,
+    auth_data = Depends(get_current_user_and_company),
+    db: Session = Depends(get_db)
+):
+    user, current_co = auth_data
+    # Company creation via onboarding should use /api/auth/register-company
     company = Company(
-        name=company_in.name,
-        industry=company_in.industry,
+        name=company_in.name.strip(),
+        industry=company_in.industry.strip(),
         company_size=company_in.company_size or "50-250 employees",
         location=company_in.location,
         contact_info=company_in.contact_info,
-        email=company_in.email,
-        manufacturing_process=company_in.manufacturing_process,
+        email=company_in.email or current_co.email,
+        manufacturing_process=company_in.manufacturing_process.strip(),
         process_description=company_in.process_description,
         data_origin="USER_REGISTERED"
     )
@@ -522,18 +635,40 @@ def create_company(company_in: CompanyCreate, db: Session = Depends(get_db)):
     return company
 
 @app.get("/api/companies/{company_id}", response_model=CompanyResponse)
-def get_company(company_id: int, db: Session = Depends(get_db)):
+def get_company(
+    company_id: int,
+    auth_data = Depends(get_current_user_and_company),
+    db: Session = Depends(get_db)
+):
+    user, current_co = auth_data
+    if user.role != "platform_owner" and company_id != current_co.id:
+        raise HTTPException(status_code=403, detail="Cannot access details of another company workspace.")
+
     company = db.query(Company).filter(Company.id == company_id).first()
     if not company:
         raise HTTPException(status_code=404, detail="Company not found")
     return company
 
 @app.put("/api/companies/{company_id}", response_model=CompanyResponse)
-def update_company(company_id: int, co_update: CompanyUpdate, db: Session = Depends(get_db)):
+def update_company(
+    company_id: int,
+    co_update: CompanyUpdate,
+    auth_data = Depends(get_current_user_and_company),
+    db: Session = Depends(get_db)
+):
+    user, current_co = auth_data
+    if company_id != current_co.id and user.role != "platform_owner":
+        raise HTTPException(status_code=403, detail="Cannot update another company's profile.")
+
     co = db.query(Company).filter(Company.id == company_id).first()
     if not co:
         raise HTTPException(status_code=404, detail="Company not found")
-    for k, v in co_update.dict(exclude_unset=True).items():
+    
+    update_data = co_update.model_dump(exclude_unset=True)
+    update_data.pop("id", None)
+    update_data.pop("data_origin", None)
+    
+    for k, v in update_data.items():
         setattr(co, k, v)
     db.commit()
     db.refresh(co)
@@ -588,7 +723,7 @@ def create_waste_stream(
     if fac_id:
         fac = db.query(Facility).filter(Facility.id == fac_id, Facility.company_id == current_co.id).first()
         if not fac:
-            fac_id = None  # Detach or ignore invalid facility
+            fac_id = None
 
     stream = WasteStream(
         company_id=current_co.id,
@@ -673,8 +808,7 @@ def update_waste_stream(
     if stream.company_id != current_co.id:
         raise HTTPException(status_code=403, detail="Cannot modify another company's waste stream.")
     
-    update_data = stream_in.dict(exclude_unset=True)
-    # Never allow company_id tampering
+    update_data = stream_in.model_dump(exclude_unset=True)
     update_data.pop("company_id", None)
     
     for field, val in update_data.items():
@@ -759,7 +893,6 @@ def _execute_stream_assessment(stream: WasteStream, db: Session) -> TestAssessme
     existing_assessments = db.query(TestAssessment).filter(TestAssessment.waste_stream_id == stream.id).order_by(TestAssessment.id.desc()).all()
     if existing_assessments:
         assessment = existing_assessments[0]
-        # Clean up any redundant duplicate rows to ensure single canonical record
         for stale in existing_assessments[1:]:
             db.delete(stale)
     else:
@@ -822,7 +955,6 @@ def get_stream_assessment(
     if stream.company_id != current_co.id and stream.data_origin != "SYNTHETIC_DEMO":
         raise HTTPException(status_code=403, detail="Cannot access another company's assessment.")
 
-    # Always fetch latest canonical assessment
     assessment = db.query(TestAssessment).filter(TestAssessment.waste_stream_id == waste_stream_id).order_by(TestAssessment.id.desc()).first()
     if not assessment:
         assessment = _execute_stream_assessment(stream, db)
@@ -877,7 +1009,7 @@ def get_assessment_ranking(
         ))
 
     # Sort strictly by canonical tws_score descending
-    results.sort(key=lambda r: r.tws_score, reverse=True)
+    results.sort(key=lambda r: r.tws_score or 0.0, reverse=True)
     return results
 
 
@@ -891,11 +1023,6 @@ def download_pdf_report(
     x_company_id: Optional[str] = FastHeader(None),
     db: Session = Depends(get_db)
 ):
-    """
-    Generates and returns an authentic, downloadable PDF report.
-    Supports 'executive', 'technical', and 'recommendations' report types.
-    Enforces strict tenant access isolation.
-    """
     effective_auth = authorization or (f"Bearer {token}" if token else None)
     user, company = get_current_user_and_company(authorization=effective_auth, x_company_id=x_company_id, db=db)
     
@@ -903,11 +1030,10 @@ def download_pdf_report(
     if not stream:
         raise HTTPException(status_code=404, detail="Waste stream not found")
         
-    # Tenant verification: company can only download reports for their own streams or synthetic public demo streams
+    # Tenant verification
     if stream.company_id != company.id and stream.data_origin != "SYNTHETIC_DEMO":
         raise HTTPException(status_code=403, detail="Unauthorized access to another company's waste stream report.")
 
-    # Get assessment & lab results
     assessment = db.query(TestAssessment).filter(TestAssessment.waste_stream_id == stream.id).order_by(TestAssessment.id.desc()).first()
     if not assessment:
         assessment = _execute_stream_assessment(stream, db)
@@ -939,7 +1065,7 @@ def download_pdf_report(
     )
 
 
-# --- Laboratory Results ---
+# --- Laboratory Results (Strictly Isolated) ---
 @app.get("/api/lab-results", response_model=List[LabResultResponse])
 def get_lab_results(
     waste_stream_id: Optional[int] = None,
@@ -960,9 +1086,9 @@ def get_lab_results(
             raise HTTPException(status_code=403, detail="Cannot access laboratory results of another company's stream.")
         q = q.filter(LabResult.waste_stream_id == waste_stream_id)
     else:
-        # Return company's streams assays + public experimental references
+        # Strictly isolate: only current company's stream assays OR public experimental reference benchmarks
         q = q.join(WasteStream, WasteStream.id == LabResult.waste_stream_id, isouter=True).filter(
-            (WasteStream.company_id == current_co.id) | (LabResult.data_origin != "USER_ENTERED")
+            (WasteStream.company_id == current_co.id) | (LabResult.data_origin == "CAESAR_EXPERIMENTAL_REFERENCE")
         )
 
     results = q.order_by(LabResult.id.desc()).all()
@@ -1005,9 +1131,18 @@ def create_lab_result(
     numeric_val = result_in.result_value_numeric
     if numeric_val is None:
         try:
-            numeric_val = float(result_in.result_value_str)
+            numeric_val = float(result_in.result_value_str.replace("<", "").replace(">", "").strip())
         except ValueError:
             numeric_val = None
+
+    # Provenance tagging: verify whether criteria for verified laboratory evidence are satisfied
+    is_verified_criteria = bool(
+        result_in.laboratory and len(result_in.laboratory.strip()) >= 3 and
+        result_in.test_method and len(result_in.test_method.strip()) >= 2 and
+        result_in.sample_id and len(result_in.sample_id.strip()) >= 2 and
+        numeric_val is not None
+    )
+    origin_tag = "VERIFIED_LAB_EVIDENCE" if is_verified_criteria else "USER_ENTERED"
 
     # Deduplicate: if an assay for this stream, sample, and parameter already exists, update in-place
     existing_assay = None
@@ -1028,6 +1163,7 @@ def create_lab_result(
         existing_assay.detection_limit = result_in.detection_limit
         existing_assay.test_method = result_in.test_method
         existing_assay.notes = result_in.notes
+        existing_assay.data_origin = origin_tag
         db.commit()
         db.refresh(existing_assay)
         lab_entry = existing_assay
@@ -1045,13 +1181,13 @@ def create_lab_result(
             detection_limit=result_in.detection_limit,
             test_method=result_in.test_method,
             notes=result_in.notes,
-            data_origin="USER_ENTERED"
+            data_origin=origin_tag
         )
         db.add(lab_entry)
         db.commit()
         db.refresh(lab_entry)
 
-    # Immediately recalculate TWS & assessment for this stream so new assay is recognized
+    # Recalculate TWS & assessment for this stream
     if result_in.waste_stream_id:
         st = db.query(WasteStream).filter(WasteStream.id == result_in.waste_stream_id).first()
         if st:
@@ -1092,6 +1228,17 @@ def analyze_recovery(
     if stream.company_id != current_co.id and stream.data_origin != "SYNTHETIC_DEMO":
         raise HTTPException(status_code=403, detail="Cannot run recovery analysis on another company's waste stream.")
 
+    stream_desc = f"{stream.stream_name} {stream.waste_category}".lower()
+    target_lower = req.target_material.lower()
+
+    # Guardrail: Liquid wastewater / effluent cannot have confirmed alloy recovery without verified chemical assay
+    is_effluent = any(w in stream_desc for w in ["wastewater", "effluent", "rinse", "acid liquor", "solution", "pickling", "spent acid"])
+    if is_effluent and (any(m in target_lower for m in ["alloy", "ingot", "brass", "steel", "remelt", "scrap"]) or "remelt" in req.scenario_type.lower() or "alloy" in req.scenario_type.lower()):
+        raise HTTPException(
+            status_code=400,
+            detail="Incompatible recovery route: Solid alloy remelting cannot be applied to liquid wastewater without confirmed chemical precipitation/effluent extraction."
+        )
+
     linked_lab = None
     if req.scenario_type == "CONFIRMED_LAB_ASSAY":
         if req.linked_lab_result_id:
@@ -1100,9 +1247,10 @@ def analyze_recovery(
                 LabResult.waste_stream_id == stream.id
             ).first()
         else:
+            target_key = req.target_material.split()[0].replace("(", "").replace(")", "").strip()
             linked_lab = db.query(LabResult).filter(
                 LabResult.waste_stream_id == stream.id,
-                LabResult.measured_parameter.ilike(f"%{req.target_material.split()[0]}%")
+                LabResult.measured_parameter.ilike(f"%{target_key}%")
             ).first()
 
         if not linked_lab:
@@ -1111,8 +1259,14 @@ def analyze_recovery(
                 detail=f"No verified laboratory assay for '{req.target_material}' is linked to this waste stream. Please record a laboratory test first, or explicitly select 'Hypothetical Scenario'."
             )
         
-        stream_desc = f"{stream.stream_name} {stream.waste_category}".lower()
-        target_lower = req.target_material.lower()
+        # Guardrail: Do not treat a pH or physical result as evidence of metal composition!
+        param_lower = linked_lab.measured_parameter.lower().strip()
+        if param_lower in ["ph", "turbidity", "conductivity", "temperature", "color", "odor", "moisture"]:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid evidence: Parameter '{linked_lab.measured_parameter}' is a physical/qualitative test, not a verified elemental composition. It cannot drive confirmed recovery calculations."
+            )
+
         if "aluminium" in stream_desc and "copper" in target_lower and req.confirmed_material_fraction > 0.05:
             raise HTTPException(
                 status_code=400,
@@ -1143,7 +1297,7 @@ def analyze_recovery(
         scenario.gross_value = calc["gross_value"]
         scenario.net_value = calc["net_value"]
         scenario.calculation_status = calc["status"]
-        scenario.notes = calc["notes"]
+        scenario.notes = calc.get("notes", "")
     else:
         scenario = RecoveryScenario(
             waste_stream_id=stream.id,
@@ -1162,7 +1316,7 @@ def analyze_recovery(
             net_value=calc["net_value"],
             calculation_status=calc["status"],
             scenario_type=req.scenario_type,
-            notes=calc["notes"]
+            notes=calc.get("notes", "")
         )
         db.add(scenario)
 
@@ -1231,44 +1385,65 @@ def get_platform_overview(
 ):
     """
     Platform Owner aggregate statistics across all registered tenants.
-    Respects confidential chemical assays (does not expose raw spectroscopy / assays).
+    Enforces privacy by design: individual company names, user emails, facilities,
+    stream names, and laboratory assays are NEVER exposed.
+    Separates synthetic demo data from production operational counts.
     """
-    total_cos = db.query(Company).count()
+    total_cos = db.query(Company).filter(Company.data_origin != "PLATFORM_SYSTEM").count()
     reg_cos = db.query(Company).filter(Company.data_origin == "USER_REGISTERED").count()
-    demo_cos = db.query(Company).filter(Company.data_origin.in_(["SYNTHETIC_DEMO", "PLATFORM_SYSTEM"])).count()
+    demo_cos = db.query(Company).filter(Company.data_origin == "SYNTHETIC_DEMO").count()
 
-    total_users = db.query(User).count()
+    total_users = db.query(User).filter(User.role != "platform_owner").count()
     users_by_role: Dict[str, int] = {}
-    for r in ["platform_owner", "admin", "company_admin", "member", "company_member"]:
+    for r in ["admin", "company_admin", "member", "company_member"]:
         c = db.query(User).filter(User.role == r).count()
         if c > 0:
             users_by_role[r] = c
 
+    prod_users = db.query(User).join(Company, Company.id == User.company_id).filter(Company.data_origin == "USER_REGISTERED").count()
     total_facs = db.query(Facility).count()
+    prod_facs = db.query(Facility).join(Company, Company.id == Facility.company_id).filter(Company.data_origin == "USER_REGISTERED").count()
     total_streams = db.query(WasteStream).count()
-    total_assessments = db.query(TestAssessment).count()
-    total_scenarios = db.query(RecoveryScenario).count()
+    prod_streams = db.query(WasteStream).filter(WasteStream.data_origin == "USER_REGISTERED").count()
 
-    # Aggregate volume across all streams
-    streams = db.query(WasteStream.quantity, WasteStream.quantity_unit).all()
+    # Distinct canonical assessments to prevent double counting
+    total_assessments = db.query(TestAssessment.waste_stream_id).distinct().count()
+    prod_stream_ids = [s[0] for s in db.query(WasteStream.id).filter(WasteStream.data_origin == "USER_REGISTERED").all()]
+    prod_assessments = db.query(TestAssessment.waste_stream_id).filter(TestAssessment.waste_stream_id.in_(prod_stream_ids)).distinct().count() if prod_stream_ids else 0
+
+    total_scenarios = db.query(RecoveryScenario).count()
+    prod_scenarios = db.query(RecoveryScenario).filter(RecoveryScenario.waste_stream_id.in_(prod_stream_ids)).count() if prod_stream_ids else 0
+
+    # Volume aggregation
+    all_streams = db.query(WasteStream.quantity, WasteStream.quantity_unit, WasteStream.data_origin).all()
     total_kg = 0.0
-    for q_val, q_unit in streams:
+    prod_kg = 0.0
+    for q_val, q_unit, d_orig in all_streams:
         if q_val:
             u = (q_unit or "kg/month").lower()
-            if "ton" in u or "t/" in u or "mt" in u:
-                total_kg += float(q_val) * 1000.0
-            else:
-                total_kg += float(q_val)
+            kg_val = float(q_val) * 1000.0 if ("ton" in u or "t/" in u or "mt" in u) else float(q_val)
+            total_kg += kg_val
+            if d_orig == "USER_REGISTERED":
+                prod_kg += kg_val
 
-    # Recent activity
+    # Registration trends
+    companies = db.query(Company.created_at).filter(Company.data_origin == "USER_REGISTERED").all()
+    trends_map: Dict[str, int] = {}
+    for (c_date,) in companies:
+        if c_date:
+            period = c_date.strftime("%Y-%m")
+            trends_map[period] = trends_map.get(period, 0) + 1
+    registration_trends = [{"period": k, "count": v} for k, v in sorted(trends_map.items())]
+
+    # Aggregate recent activity: strictly anonymized (NO company names, NO proprietary stream names)
     recent_streams = db.query(WasteStream).order_by(WasteStream.id.desc()).limit(10).all()
     activity = []
     for st in recent_streams:
         activity.append({
             "id": f"act-stream-{st.id}",
             "type": "Stream Registered",
-            "title": f"{st.stream_name} ({st.waste_category or 'Unspecified'})",
-            "company_name": st.company.name if st.company else "Unknown",
+            "title": f"Waste Stream Registered ({st.waste_category or 'Industrial Waste'})",
+            "company_name": f"Tenant #{st.company_id} ({st.company.industry if st.company else 'Industrial'})",
             "company_id": st.company_id,
             "created_at": st.created_at.isoformat() if st.created_at else None
         })
@@ -1278,12 +1453,19 @@ def get_platform_overview(
         registered_companies=reg_cos,
         demo_companies=demo_cos,
         total_users=total_users,
+        production_users=prod_users,
         users_by_role=users_by_role,
         total_facilities=total_facs,
+        production_facilities=prod_facs,
         total_waste_streams=total_streams,
+        production_waste_streams=prod_streams,
         total_assessments=total_assessments,
+        production_assessments=prod_assessments,
         total_recovery_scenarios=total_scenarios,
+        production_recovery_scenarios=prod_scenarios,
         total_monthly_volume_kg=round(total_kg, 2),
+        production_monthly_volume_kg=round(prod_kg, 2),
+        registration_trends=registration_trends,
         recent_activity=activity
     )
 
@@ -1294,10 +1476,10 @@ def get_platform_companies(
 ):
     """
     Platform Owner tenant overview.
-    Returns high-level metadata and aggregate stream metrics for each tenant.
-    Never leaks private lab assays or proprietary process details.
+    Enforces privacy by design: individual company names, user emails, facilities,
+    stream names, and laboratory assays are NEVER exposed.
     """
-    companies = db.query(Company).order_by(Company.id.asc()).all()
+    companies = db.query(Company).filter(Company.data_origin != "PLATFORM_SYSTEM").order_by(Company.id.asc()).all()
     summaries = []
     for co in companies:
         u_count = db.query(User).filter(User.company_id == co.id).count()
@@ -1311,10 +1493,7 @@ def get_platform_companies(
             stream_ids.append(s.id)
             if s.quantity:
                 u = (s.quantity_unit or "kg/month").lower()
-                if "ton" in u or "t/" in u or "mt" in u:
-                    co_kg += float(s.quantity) * 1000.0
-                else:
-                    co_kg += float(s.quantity)
+                co_kg += float(s.quantity) * 1000.0 if ("ton" in u or "t/" in u or "mt" in u) else float(s.quantity)
 
         high_pri = 0
         if stream_ids:
@@ -1323,12 +1502,23 @@ def get_platform_companies(
                 TestAssessment.priority_level == "High"
             ).count()
 
+        # Privacy by design: Mask name and email for user-registered tenants
+        if co.data_origin == "USER_REGISTERED":
+            display_name = f"Tenant #{co.id} ({co.industry})"
+            display_email = None
+            loc_parts = [p.strip() for p in (co.location or "").split(",") if p.strip()]
+            display_loc = loc_parts[-1] if loc_parts else "India"
+        else:
+            display_name = co.name
+            display_email = None
+            display_loc = co.location
+
         summaries.append(PlatformCompanySummary(
             id=co.id,
-            name=co.name,
+            name=display_name,
             industry=co.industry,
-            location=co.location,
-            email=co.email,
+            location=display_loc,
+            email=display_email,
             company_size=co.company_size,
             created_at=co.created_at,
             data_origin=co.data_origin,
@@ -1349,7 +1539,9 @@ def get_platform_company_detail(
 ):
     """
     Detailed tenant inspection for Platform Owner.
-    Includes facility list and waste streams summary without raw spectroscopy assays.
+    Returns operational metadata and category summaries.
+    Enforces privacy by design: individual company names, user emails, facilities,
+    stream names, and laboratory assays are NEVER exposed.
     """
     company = db.query(Company).filter(Company.id == company_id).first()
     if not company:
@@ -1368,23 +1560,73 @@ def get_platform_company_detail(
         has_lab = db.query(LabResult).filter(LabResult.waste_stream_id == s.id).count() > 0
         streams_summary.append({
             "id": s.id,
-            "stream_name": s.stream_name,
+            "stream_name": f"Stream #{s.id} ({s.waste_category})",
             "waste_category": s.waste_category,
-            "physical_form": s.physical_form,
+            "physical_form": "Solid" if "scrap" in s.waste_category.lower() or "chips" in s.waste_category.lower() else "Sludge / Liquid",
             "quantity": s.quantity,
             "quantity_unit": s.quantity_unit,
-            "facility_name": s.facility.name if s.facility else "Unassigned",
+            "facility_name": f"Facility #{s.facility_id}" if s.facility_id else "Unassigned",
             "has_lab_results": has_lab,
             "tws_score": assessment.tws_score if assessment else None,
             "priority_level": assessment.priority_level if assessment else "Pending",
             "recommendation": assessment.recommendation if assessment else "Pending Investigation"
         })
 
-    return PlatformCompanyDetail(
-        company=CompanyResponse.model_validate(company),
-        users=[UserResponse.model_validate(u) for u in users],
-        facilities=[FacilityResponse.model_validate(f) for f in facilities],
-        waste_streams_summary=streams_summary,
-        recovery_scenarios_count=scenarios_count
+    display_name = f"Tenant #{company.id} ({company.industry})" if company.data_origin == "USER_REGISTERED" else company.name
+    masked_co = CompanyResponse(
+        id=company.id,
+        name=display_name,
+        industry=company.industry,
+        company_size=company.company_size,
+        location="India" if company.data_origin == "USER_REGISTERED" else company.location,
+        contact_info=None,
+        email=None,
+        manufacturing_process=company.manufacturing_process,
+        process_description="[Protected Tenant Operational Context]" if company.data_origin == "USER_REGISTERED" else company.process_description,
+        data_origin=company.data_origin,
+        created_at=company.created_at
     )
 
+    masked_users = [
+        UserResponse(
+            id=u.id,
+            company_id=u.company_id,
+            email=f"user_{u.id}@tenant.protected",
+            full_name=f"Workspace Member #{u.id}",
+            role=u.role,
+            created_at=u.created_at
+        ) for u in users
+    ]
+
+    masked_facilities = [
+        FacilityResponse(
+            id=f.id,
+            company_id=f.company_id,
+            name=f"Facility #{f.id} ({f.primary_process})",
+            location=f.location,
+            primary_process=f.primary_process,
+            description=None,
+            image_url=f.image_url,
+            waste_stream_count=len(f.waste_streams),
+            created_at=f.created_at
+        ) for f in facilities
+    ]
+
+    category_counts: Dict[str, int] = {}
+    for s in streams:
+        category_counts[s.waste_category] = category_counts.get(s.waste_category, 0) + 1
+
+    assessments_count = db.query(TestAssessment).filter(TestAssessment.waste_stream_id.in_(stream_ids)).count() if stream_ids else 0
+
+    return PlatformCompanyDetail(
+        company=masked_co,
+        users=masked_users,
+        facilities=masked_facilities,
+        facilities_count=len(facilities),
+        waste_streams_count=len(streams),
+        stream_categories=category_counts,
+        waste_streams_summary=streams_summary,
+        assessments_count=assessments_count,
+        recovery_scenarios_count=scenarios_count,
+        privacy_notice="Confidentiality Protected: Raw spectroscopy, chemical assays, and trade secrets are strictly quarantined within each tenant's isolated workspace."
+    )

@@ -25,7 +25,7 @@ export const SignInPage: React.FC = () => {
 
     try {
       setLoading(true);
-      await login(email, password);
+      await login(email.trim().toLowerCase(), password);
       navigate('/app/dashboard');
     } catch (err: any) {
       setError(err.message || 'Authentication failed. Please verify your credentials.');

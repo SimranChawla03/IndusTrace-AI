@@ -70,11 +70,11 @@ export const Dashboard: React.FC = () => {
 
         {summary && (
           <>
-            {/* 1. Quick Stats Grid: 4 Cards matching Reference Panel 4 */}
+            {/* 1. Quick Stats Grid */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-5 w-full">
               <div className="bg-[#FFFFFF] p-6 rounded-2xl border border-[#DCE5DA] flex flex-col justify-between shadow-2xs hover:shadow-xs transition">
                 <span className="text-[34px] font-bold text-[#202C25] leading-none">
-                  {summary.facilities_count || 3}
+                  {summary.facilities_count}
                 </span>
                 <span className="text-[14px] font-semibold text-[#56645A] mt-3">
                   Facilities
@@ -91,21 +91,35 @@ export const Dashboard: React.FC = () => {
               </div>
 
               <div className="bg-[#FFFFFF] p-6 rounded-2xl border border-[#DCE5DA] flex flex-col justify-between shadow-2xs hover:shadow-xs transition">
-                <span className="text-[34px] font-bold text-[#8A5A00] leading-none">
-                  {summary.awaiting_investigation_count}
-                </span>
-                <span className="text-[14px] font-semibold text-[#56645A] mt-3">
-                  Pending Tests
-                </span>
+                <div>
+                  <span className="text-[34px] font-bold text-[#8A5A00] leading-none">
+                    {summary.awaiting_investigation_count}
+                  </span>
+                  <div className="text-[14px] font-semibold text-[#56645A] mt-3">
+                    Pending Tests
+                  </div>
+                </div>
+                <p className="text-[11px] text-[#778279] mt-1">
+                  {summary.awaiting_investigation_count === 0 
+                    ? "All streams verified" 
+                    : `${summary.awaiting_investigation_count} stream(s) awaiting lab assays`}
+                </p>
               </div>
 
               <div className="bg-[#FFFFFF] p-6 rounded-2xl border border-[#DCE5DA] flex flex-col justify-between shadow-2xs hover:shadow-xs transition">
-                <span className="text-[34px] font-bold text-[#26734D] leading-none">
-                  {summary.potentially_recoverable_count}
-                </span>
-                <span className="text-[14px] font-semibold text-[#56645A] mt-3">
-                  Potential Opportunities
-                </span>
+                <div>
+                  <span className="text-[34px] font-bold text-[#26734D] leading-none">
+                    {summary.potentially_recoverable_count}
+                  </span>
+                  <div className="text-[14px] font-semibold text-[#56645A] mt-3">
+                    Potential Opportunities
+                  </div>
+                </div>
+                <p className="text-[11px] text-[#778279] mt-1">
+                  {summary.potentially_recoverable_count === 0
+                    ? "0 circular models evaluated"
+                    : `${summary.potentially_recoverable_count} viable recovery route(s)`}
+                </p>
               </div>
             </div>
 
@@ -122,9 +136,9 @@ export const Dashboard: React.FC = () => {
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-12 gap-4 items-center">
-                  <div className="sm:col-span-6 h-56 flex items-center justify-center relative">
-                    {summary.category_distribution.length > 0 ? (
-                      <ResponsiveContainer width="100%" height="100%">
+                  <div className="sm:col-span-6 min-w-0 w-full h-[240px] flex items-center justify-center relative">
+                    {summary.category_distribution.length > 0 && summary.waste_streams_count > 0 ? (
+                      <ResponsiveContainer width="100%" height={230} minWidth={100} minHeight={200}>
                         <PieChart>
                           <Pie
                             data={summary.category_distribution}
@@ -145,25 +159,35 @@ export const Dashboard: React.FC = () => {
                         </PieChart>
                       </ResponsiveContainer>
                     ) : (
-                      <p className="text-[14px] text-[#778279]">No categories recorded</p>
+                      <div className="text-center p-6">
+                        <p className="text-[13px] text-[#778279]">No waste stream categories recorded yet.</p>
+                        <Link to="/app/facilities" className="text-[12px] text-[#26734D] font-semibold hover:underline mt-1 inline-block">
+                          + Add First Stream
+                        </Link>
+                      </div>
                     )}
                     {/* Donut center total */}
-                    <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                      <span className="text-[22px] font-bold text-[#202C25]">{summary.waste_streams_count}</span>
-                      <span className="text-[11px] text-[#778279] uppercase tracking-wider font-semibold">Streams</span>
-                    </div>
+                    {summary.waste_streams_count > 0 && (
+                      <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                        <span className="text-[22px] font-bold text-[#202C25]">{summary.waste_streams_count}</span>
+                        <span className="text-[11px] text-[#778279] uppercase tracking-wider font-semibold">Streams</span>
+                      </div>
+                    )}
                   </div>
 
-                  <div className="sm:col-span-6 space-y-2">
+                  <div className="sm:col-span-6 space-y-2 max-h-[220px] overflow-y-auto">
                     {summary.category_distribution.map((cat, idx) => (
                       <div key={cat.name} className="flex items-center justify-between text-[13px] p-2 rounded-lg bg-[#F7F8F3]/60">
                         <div className="flex items-center gap-2">
-                          <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: SAGE_CHART_COLORS[idx % SAGE_CHART_COLORS.length] }}></span>
-                          <span className="font-medium text-[#202C25]">{cat.name}</span>
+                          <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: SAGE_CHART_COLORS[idx % SAGE_CHART_COLORS.length] }}></span>
+                          <span className="font-medium text-[#202C25] truncate">{cat.name}</span>
                         </div>
-                        <span className="font-semibold text-[#56645A] font-mono">{cat.value}</span>
+                        <span className="font-semibold text-[#56645A] font-mono ml-2">{cat.value}</span>
                       </div>
                     ))}
+                    {summary.category_distribution.length === 0 && (
+                      <p className="text-[12px] text-[#778279] italic">No category data to display.</p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -241,20 +265,45 @@ export const Dashboard: React.FC = () => {
                 </div>
               </div>
 
-              {/* Next Recommended Action Banner matching Reference Panel 4 */}
+              {/* Next Recommended Action Banner */}
               <div className="lg:col-span-5 bg-[#FFFFFF] p-6 rounded-2xl border border-[#DCE5DA] shadow-2xs flex flex-col justify-between">
                 <div>
-                  <div className="flex items-center gap-2 text-[#26734D] font-semibold text-[13px] uppercase tracking-wider">
-                    <Sparkles className="w-4 h-4" />
-                    <span>Next Recommended Action</span>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-[#26734D] font-semibold text-[13px] uppercase tracking-wider">
+                      <Sparkles className="w-4 h-4" />
+                      <span>Next Recommended Action</span>
+                    </div>
+                    {summary.next_recommended_action?.priority && (
+                      <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${
+                        summary.next_recommended_action.priority === 'High'
+                          ? 'bg-[#FDECEC] text-[#A42D2D] border border-[#F5C2C2]'
+                          : 'bg-[#E5EEE3] text-[#26734D] border border-[#C2D8C4]'
+                      }`}>
+                        {summary.next_recommended_action.priority} Priority
+                      </span>
+                    )}
                   </div>
 
                   <h4 className="text-[20px] font-bold text-[#202C25] mt-3">
-                    Further Laboratory Testing
+                    {summary.next_recommended_action?.action || "Conduct Laboratory Testing"}
                   </h4>
-                  <p className="text-[14px] text-[#56645A] mt-2 leading-relaxed">
-                    Critical compositional parameters are pending for registered machining chips and sludges. Certify exact alloy grade and coolant moisture prior to recovery commitment.
+
+                  {summary.next_recommended_action?.stream_name && (
+                    <div className="mt-2 inline-block px-2.5 py-1 bg-[#F0F5EC] border border-[#DCE5DA] rounded-lg text-xs font-semibold text-[#202C25]">
+                      Target: {summary.next_recommended_action.stream_name} ({summary.next_recommended_action.category})
+                    </div>
+                  )}
+
+                  <p className="text-[14px] text-[#56645A] mt-2.5 leading-relaxed">
+                    {summary.next_recommended_action?.reason || 
+                     "Critical compositional parameters are pending for registered waste streams. Certify exact elemental assays prior to recovery commitment."}
                   </p>
+
+                  {summary.next_recommended_action?.suggested_next_step && (
+                    <p className="text-[12px] text-[#26734D] mt-2 font-medium">
+                      <strong>Prescribed Step:</strong> {summary.next_recommended_action.suggested_next_step}
+                    </p>
+                  )}
                 </div>
 
                 <div className="pt-6 mt-6 border-t border-[#DCE5DA] flex items-center justify-between gap-3">
