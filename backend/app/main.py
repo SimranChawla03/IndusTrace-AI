@@ -58,27 +58,32 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Configure CORS securely for local Vite frontend and configured origins
+# Configure CORS securely for local Vite frontend, Vercel deployments, and custom domains
 allowed_origins_env = os.getenv("ALLOWED_ORIGINS", "")
 allowed_origins = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
     "http://localhost:3000",
     "http://127.0.0.1:8000",
-    "http://localhost:8000"
+    "http://localhost:8000",
+    "https://indus-trace-ai-beta.vercel.app",
+    "https://industrace-ai.vercel.app",
+    "https://industrace-ai-backend.onrender.com"
 ]
 if allowed_origins_env:
     for o in allowed_origins_env.split(","):
-        if o.strip() and o.strip() not in allowed_origins:
-            allowed_origins.append(o.strip())
+        clean_o = o.strip().rstrip("/")
+        if clean_o and clean_o not in allowed_origins:
+            allowed_origins.append(clean_o)
 if os.getenv("FRONTEND_URL"):
-    fu = os.getenv("FRONTEND_URL").strip()
+    fu = os.getenv("FRONTEND_URL").strip().rstrip("/")
     if fu not in allowed_origins:
         allowed_origins.append(fu)
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
+    allow_origin_regex=r"^https?://.*",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
