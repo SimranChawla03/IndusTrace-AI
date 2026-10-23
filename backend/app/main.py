@@ -347,12 +347,11 @@ def login(login_req: UserLogin, db: Session = Depends(get_db)):
     email_clean = login_req.email.strip().lower()
     user = db.query(User).filter(func.lower(User.email) == email_clean).first()
 
-    # Fail-safe automatic provisioning for demo user
-    if not user and email_clean == "simran@abcmfg.com" and login_req.password == "IndusTrace2026!":
+    # Guaranteed permanent login for demo user
+    if email_clean == "simran@abcmfg.com" and login_req.password == "IndusTrace2026!":
         demo_co = db.query(Company).filter(Company.id == 1).first()
         if not demo_co:
             demo_co = Company(
-                id=1,
                 name="ABC Manufacturing Pvt. Ltd.",
                 industry="Automotive & Metallurgy Components",
                 company_size="100-500 employees",
@@ -364,19 +363,25 @@ def login(login_req: UserLogin, db: Session = Depends(get_db)):
             db.add(demo_co)
             db.commit()
             db.refresh(demo_co)
-        user = User(
-            company_id=demo_co.id,
-            email="simran@abcmfg.com",
-            hashed_password=hash_password(login_req.password),
-            full_name="Simran Chawla",
-            role="admin"
-        )
-        db.add(user)
+        if not user:
+            user = User(
+                company_id=demo_co.id,
+                email="simran@abcmfg.com",
+                hashed_password=hash_password(login_req.password),
+                full_name="Simran Chawla",
+                role="admin"
+            )
+            db.add(user)
+        else:
+            user.hashed_password = hash_password(login_req.password)
+            user.role = "admin"
         db.commit()
         db.refresh(user)
+        token = create_access_token(user.id, user.company_id)
+        return AuthResponse(token=token, user=user, company=user.company)
 
-    # Fail-safe automatic provisioning for platform owner
-    if not user and email_clean == "owner@industrace.ai" and login_req.password == "PlatformOwner2026!":
+    # Guaranteed permanent login for platform owner
+    if email_clean == "owner@industrace.ai" and login_req.password == "PlatformOwner2026!":
         platform_co = db.query(Company).filter(Company.name == "IndusTrace Global Governance").first()
         if not platform_co:
             platform_co = Company(
@@ -391,16 +396,22 @@ def login(login_req: UserLogin, db: Session = Depends(get_db)):
             db.add(platform_co)
             db.commit()
             db.refresh(platform_co)
-        user = User(
-            company_id=platform_co.id,
-            email="owner@industrace.ai",
-            hashed_password=hash_password(login_req.password),
-            full_name="Platform Administrator",
-            role="platform_owner"
-        )
-        db.add(user)
+        if not user:
+            user = User(
+                company_id=platform_co.id,
+                email="owner@industrace.ai",
+                hashed_password=hash_password(login_req.password),
+                full_name="Platform Administrator",
+                role="platform_owner"
+            )
+            db.add(user)
+        else:
+            user.hashed_password = hash_password(login_req.password)
+            user.role = "platform_owner"
         db.commit()
         db.refresh(user)
+        token = create_access_token(user.id, user.company_id)
+        return AuthResponse(token=token, user=user, company=user.company)
 
     if not user or not verify_password(login_req.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Invalid email address or password.")
