@@ -208,6 +208,16 @@ def on_startup():
                 platform_owner.hashed_password = hash_password(owner_pwd)
                 platform_owner.role = "platform_owner"
                 db.commit()
+
+        # In PostgreSQL, guarantee serial sequences to prevent duplicate primary key conflicts
+        if db.bind and db.bind.dialect.name == "postgresql":
+            from sqlalchemy import text
+            for tbl in ['companies', 'users', 'facilities', 'waste_streams', 'lab_results', 'test_assessments', 'recovery_scenarios']:
+                try:
+                    db.execute(text(f"SELECT setval(pg_get_serial_sequence('{tbl}', 'id'), COALESCE((SELECT MAX(id) FROM {tbl}), 0) + 1, false);"))
+                except Exception:
+                    pass
+            db.commit()
     finally:
         db.close()
 
@@ -301,11 +311,23 @@ def require_platform_owner(
 
 # --- Health & Metadata ---
 @app.get("/api/health")
-def get_health():
+def get_health(db: Session = Depends(get_db)):
+    dialect = "unknown"
+    u_count = 0
+    c_count = 0
+    try:
+        dialect = db.bind.dialect.name if db.bind else "unknown"
+        u_count = db.query(User).count()
+        c_count = db.query(Company).count()
+    except Exception:
+        pass
     return {
         "status": "healthy",
         "service": "IndusTrace AI",
         "version": "1.0.0",
+        "database": dialect,
+        "registered_companies": c_count,
+        "registered_users": u_count,
         "team": {
             "members": [
                 "Deeya Saoji (Roll No. 50, A3_B4)",
