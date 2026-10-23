@@ -1,8 +1,12 @@
 /// <reference types="vite/client" />
 // frontend/src/services/api.ts
-const PROD_BACKEND_URL = 'https://industrace-ai-backend.onrender.com';
-const RAW_API_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:8000' : PROD_BACKEND_URL);
-const API_BASE = RAW_API_URL.replace(/\/$/, '') + '/api';
+// In production on Vercel, requests use relative path '/api' transparently proxied
+// by vercel.json rewrites to https://industrace-ai-backend.onrender.com/api.
+// This completely eliminates cross-origin CORS preflight issues in all browsers.
+const RAW_API_URL = import.meta.env.VITE_API_URL !== undefined
+  ? import.meta.env.VITE_API_URL
+  : (import.meta.env.DEV ? 'http://localhost:8000' : '');
+const API_BASE = (RAW_API_URL ? RAW_API_URL.replace(/\/$/, '') : '') + '/api';
 
 export interface User {
   id: number;
