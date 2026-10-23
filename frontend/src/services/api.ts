@@ -1,6 +1,8 @@
 /// <reference types="vite/client" />
 // frontend/src/services/api.ts
-const API_BASE = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '') + '/api';
+const PROD_BACKEND_URL = 'https://industrace-ai-backend.onrender.com';
+const RAW_API_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:8000' : PROD_BACKEND_URL);
+const API_BASE = RAW_API_URL.replace(/\/$/, '') + '/api';
 
 export interface User {
   id: number;
