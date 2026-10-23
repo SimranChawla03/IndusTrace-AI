@@ -1,10 +1,13 @@
 # backend/app/models/entities.py
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import (
     Column, Integer, String, Text, Float, Boolean, DateTime, ForeignKey, JSON
 )
 from sqlalchemy.orm import relationship
 from app.database.connection import Base
+
+def get_utc_now():
+    return datetime.now(timezone.utc)
 
 class Company(Base):
     __tablename__ = "companies"
@@ -18,8 +21,8 @@ class Company(Base):
     email = Column(String(255), nullable=True)
     manufacturing_process = Column(String(255), nullable=False)
     process_description = Column(Text, nullable=True)
-    data_origin = Column(String(50), default="USER_REGISTERED")  # USER_REGISTERED, SYNTHETIC_DEMO
-    created_at = Column(DateTime, default=datetime.utcnow)
+    data_origin = Column(String(50), default="USER_REGISTERED")  # USER_REGISTERED, SYNTHETIC_DEMO, PLATFORM_SYSTEM
+    created_at = Column(DateTime, default=get_utc_now)
 
     facilities = relationship("Facility", back_populates="company", cascade="all, delete-orphan")
     users = relationship("User", back_populates="company", cascade="all, delete-orphan")
@@ -34,8 +37,8 @@ class User(Base):
     email = Column(String(255), unique=True, index=True, nullable=False)
     hashed_password = Column(String(255), nullable=False)
     full_name = Column(String(255), nullable=False)
-    role = Column(String(50), default="admin")  # admin, member
-    created_at = Column(DateTime, default=datetime.utcnow)
+    role = Column(String(50), default="admin")  # admin, member, platform_owner
+    created_at = Column(DateTime, default=get_utc_now)
 
     company = relationship("Company", back_populates="users")
 
@@ -50,7 +53,7 @@ class Facility(Base):
     primary_process = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
     image_url = Column(String(255), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=get_utc_now)
 
     company = relationship("Company", back_populates="facilities")
     waste_streams = relationship("WasteStream", back_populates="facility")
@@ -73,7 +76,7 @@ class WasteStream(Base):
     estimated_handling_cost = Column(Float, nullable=True)
     recovery_info = Column(Text, nullable=True)
     data_origin = Column(String(50), default="USER_REGISTERED")  # USER_REGISTERED, SYNTHETIC_DEMO
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=get_utc_now)
 
     company = relationship("Company", back_populates="waste_streams")
     facility = relationship("Facility", back_populates="waste_streams")
@@ -129,8 +132,8 @@ class LabResult(Base):
     detection_limit = Column(String(50), nullable=True)
     test_method = Column(String(255), nullable=True)
     notes = Column(Text, nullable=True)
-    data_origin = Column(String(50), default="USER_ENTERED")  # USER_ENTERED, CAESAR_EXPERIMENTAL_REFERENCE
-    created_at = Column(DateTime, default=datetime.utcnow)
+    data_origin = Column(String(50), default="USER_ENTERED")  # USER_ENTERED, VERIFIED_LAB_EVIDENCE, CAESAR_EXPERIMENTAL_REFERENCE
+    created_at = Column(DateTime, default=get_utc_now)
 
     waste_stream = relationship("WasteStream", back_populates="lab_results")
 
@@ -148,7 +151,7 @@ class TestAssessment(Base):
     recommendation = Column(String(255), nullable=False)
     recommendation_details = Column(JSON, nullable=False)  # action, reason, evidence, limitations, next_step
     scoring_version = Column(String(50), default="v1.0-prototype")
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=get_utc_now)
 
     waste_stream = relationship("WasteStream", back_populates="assessments")
 
@@ -175,6 +178,6 @@ class RecoveryScenario(Base):
     calculation_status = Column(String(50), nullable=False)  # COMPLETE, INSUFFICIENT_COST_INPUTS, INSUFFICIENT_LAB_DATA
     scenario_type = Column(String(50), default="CONFIRMED_LAB_ASSAY")  # CONFIRMED_LAB_ASSAY, HYPOTHETICAL_SCENARIO
     notes = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=get_utc_now)
 
     waste_stream = relationship("WasteStream", back_populates="recovery_scenarios")

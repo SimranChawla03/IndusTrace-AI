@@ -643,3 +643,483 @@ def test_platform_owner_role_and_governance_access(client, benchmark_info):
         assert "name" in co
         assert "waste_stream_count" in co
 
+
+def test_company_registration_transactional_integrity(client):
+    """
+    Test that registration is atomic: creates company, admin user, and facility.
+    Duplicate email returns 400, and no partial records remain.
+    """
+    reg_payload = {
+        "company_name": "Transactional Precision Labs",
+        "industry": "Surface Finishing & Electroplating",
+        "company_size": "50-250 employees",
+        "location": "Chennai, Tamil Nadu",
+        "manufacturing_process": "Hard Chrome & Nickel Electroplating",
+        "full_name": "Ravi Shankar",
+        "email": "ravi.shankar@precisionlabs.com",
+        "password": "SecurePassword2026!"
+    }
+    
+    # 1. Register successfully
+    res = client.post("/api/auth/register-company", json=reg_payload)
+    assert res.status_code == 200, res.text
+    data = res.json()
+    assert "token" in data
+    assert data["user"]["email"] == "ravi.shankar@precisionlabs.com"
+    assert data["company"]["name"] == "Transactional Precision Labs"
+
+    # 2. Attempt duplicate registration with same email -> must fail with 400
+    dup_res = client.post("/api/auth/register-company", json=reg_payload)
+    assert dup_res.status_code == 400
+    assert "already exists" in dup_res.json()["detail"].lower()
+
+    # 3. Log in with newly registered credentials -> must succeed
+    login_res = client.post("/api/auth/login", json={
+        "email": "ravi.shankar@precisionlabs.com",
+        "password": "SecurePassword2026!"
+    })
+    assert login_res.status_code == 200
+    assert login_res.json()["user"]["full_name"] == "Ravi Shankar"
+
+
+def test_platform_owner_privacy_anonymization(client):
+    """
+    Test that Platform Owner views strictly anonymize tenant identities and emails,
+    and separate production metrics from synthetic demo data.
+    """
+    owner_login = client.post("/api/auth/login", json={
+        "email": "owner@industrace.ai",
+        "password": "PlatformOwner2026!"
+    })
+    assert owner_login.status_code == 200
+    owner_token = owner_login.json()["token"]
+    owner_headers = {"Authorization": f"Bearer {owner_token}"}
+
+    # Verify overview has distinct production and demo counts
+    overview_res = client.get("/api/platform/overview", headers=owner_headers)
+    assert overview_res.status_code == 200
+    overview = overview_res.json()
+    assert "total_companies" in overview
+    assert "registered_companies" in overview
+    assert "demo_companies" in overview
+    assert "production_users" in overview
+    assert "production_waste_streams" in overview
+    assert "registration_trends" in overview
+    assert len(overview["registration_trends"]) > 0
+
+    # Verify company list masks tenant names and user emails for registered tenants
+    companies_res = client.get("/api/platform/companies", headers=owner_headers)
+    assert companies_res.status_code == 200
+    companies = companies_res.json()
+    for co in companies:
+        if co.get("data_origin") == "USER_REGISTERED":
+            assert co["email"] is None, f"Company email leaked to Platform Owner: {co['email']}"
+            assert co["name"].startswith("Tenant #"), f"Company legal name exposed: {co['name']}"
+
+    # Verify company detail masks facilities, user emails, and stream names
+    user_reg_cos = [c for c in companies if c.get("data_origin") == "USER_REGISTERED"]
+    assert len(user_reg_cos) > 0, "Should have registered companies in test database"
+    target_co_id = user_reg_cos[0]["id"]
+    detail_res = client.get(f"/api/platform/companies/{target_co_id}", headers=owner_headers)
+    assert detail_res.status_code == 200
+    detail = detail_res.json()
+    assert "facilities_count" in detail
+    assert "waste_streams_count" in detail
+    assert "stream_categories" in detail
+    assert "privacy_notice" in detail
+    for u in detail.get("users", []):
+        assert "@tenant.protected" in u["email"], f"Unmasked email in detail: {u['email']}"
+        assert "Workspace Member" in u["full_name"], f"Unmasked name in detail: {u['full_name']}"
+    for s in detail.get("waste_streams_summary", []):
+        assert s["stream_name"].startswith("Stream #"), f"Unmasked stream in detail: {s['stream_name']}"
+
+
+def test_chemical_and_recovery_guardrails(client, benchmark_info):
+    """
+    Test scientific guardrails:
+    1. pH assays cannot justify elemental metal recovery.
+    2. Liquid wastewater streams cannot receive pyrometallurgical alloy remelt recommendations.
+    """
+    headers = {"Authorization": f"Bearer {benchmark_info['token']}"}
+
+    # 1. Create a liquid wastewater stream
+    stream_payload = {
+        "stream_name": "Spent Pickling Acid Rinse Wastewater",
+        "waste_category": "Spent Acids & Pickling Liquor",
+        "generating_process": "Hydrochloric Acid Pickling of Steel Wire",
+        "quantity": 1200.0,
+        "quantity_unit": "L/week",
+        "frequency": "Weekly",
+        "current_handling": "Neutralization pit and discharged",
+        "known_characteristics": "pH 1.8, dissolved ferrous chloride, trace zinc"
+    }
+    s_res = client.post("/api/waste-streams", json=stream_payload, headers=headers)
+    assert s_res.status_code == 200
+    stream_id = s_res.json()["id"]
+
+    # 2. Add an illustrative pH assay (pH = 2.1)
+    ph_assay = {
+        "waste_stream_id": stream_id,
+        "sample_id": "PH-TEST-001",
+        "sample_date": "2026-10-23",
+        "laboratory": "In-House Environmental Lab",
+        "test_name": "Standard pH Potentiometry",
+        "measured_parameter": "pH",
+        "result_value_str": "2.1",
+        "unit": "pH units"
+    }
+    assay_res = client.post("/api/lab-results", json=ph_assay, headers=headers)
+    assert assay_res.status_code == 200
+
+    # 3. Running recovery analysis on wastewater with pyrometallurgical alloy recovery must be rejected
+    alloy_recovery_attempt = {
+        "waste_stream_id": stream_id,
+        "target_material": "Aluminium (Al)",
+        "scenario_type": "HIGH_CONFIDENCE_ALLOY_REMELT",
+        "confirmed_material_fraction": 0.80,
+        "recovery_rate_assumption": 0.75,
+        "market_price_per_kg": 210.0,
+        "processing_cost_per_kg": 35.0
+    }
+    rec_res = client.post(f"/api/recovery/analyze/{stream_id}", json=alloy_recovery_attempt, headers=headers)
+    assert rec_res.status_code == 400
+    assert "liquid wastewater" in rec_res.json()["detail"].lower() or "guardrail" in rec_res.json()["detail"].lower()
+
+    # 4. Check assessment recommendation: must recommend supplementary testing / effluent treatment, NOT secondary remelting
+    assess_res = client.get(f"/api/assessment/{stream_id}", headers=headers)
+    assert assess_res.status_code == 200
+    recom = assess_res.json()["recommendation_details"]
+    assert "remelt" not in recom["action"].lower(), "Remelting must never be recommended for liquid wastewater"
+    assert any(term in (recom["action"] + " " + recom["reason"]).lower() for term in ["testing", "effluent", "precipitation", "neutralization", "recovery"])
+
+
+def test_tenant_isolation_strictness(client):
+    """
+    Test strict tenant isolation: Company A user cannot access Company B resources.
+    """
+    # 1. Register Tenant A
+    res_a = client.post("/api/auth/register-company", json={
+        "company_name": "Tenant Alpha Foundry",
+        "industry": "Foundry",
+        "full_name": "Alpha Admin",
+        "email": "alpha.admin@alphafoundry.com",
+        "password": "Password123!"
+    })
+    assert res_a.status_code == 200
+    token_a = res_a.json()["token"]
+    headers_a = {"Authorization": f"Bearer {token_a}"}
+
+    # 2. Register Tenant B
+    res_b = client.post("/api/auth/register-company", json={
+        "company_name": "Tenant Beta Metals",
+        "industry": "Metals",
+        "full_name": "Beta Admin",
+        "email": "beta.admin@betametals.com",
+        "password": "Password123!"
+    })
+    assert res_b.status_code == 200
+    token_b = res_b.json()["token"]
+    headers_b = {"Authorization": f"Bearer {token_b}"}
+
+    # 3. Tenant A creates a stream
+    stream_res = client.post("/api/waste-streams", json={
+        "stream_name": "Confidential Titanium Turnings",
+        "waste_category": "Machining Chips",
+        "generating_process": "Aerospace Machining",
+        "quantity": 100.0,
+        "quantity_unit": "kg/month"
+    }, headers=headers_a)
+    assert stream_res.status_code == 200
+    stream_a_id = stream_res.json()["id"]
+
+    # 4. Tenant B attempts to read Tenant A's stream -> 403 Forbidden
+    cross_read = client.get(f"/api/waste-streams/{stream_a_id}", headers=headers_b)
+    assert cross_read.status_code == 403
+
+    # 5. Tenant B attempts to delete Tenant A's stream -> 403 Forbidden
+    cross_del = client.delete(f"/api/waste-streams/{stream_a_id}", headers=headers_b)
+    assert cross_del.status_code == 403
+
+    # 6. Tenant B attempts to download PDF of Tenant A's stream -> 403 Forbidden
+    cross_pdf = client.get(f"/api/reports/pdf/executive/{stream_a_id}", headers=headers_b)
+    assert cross_pdf.status_code == 403
+
+
+def test_auth_recovery_service():
+    """
+    Test headless Platform Owner account recovery utility.
+    """
+    from app.services.auth_recovery import reset_platform_owner_password
+    db = TestingSessionLocal()
+    try:
+        success = reset_platform_owner_password("owner@industrace.ai", "NewOwnerPassword2026!", db=db)
+        assert success is True
+
+        # Verify password verification succeeds
+        from app.main import verify_password
+        owner = db.query(User).filter(User.email == "owner@industrace.ai").first()
+        assert owner is not None
+        assert verify_password("NewOwnerPassword2026!", owner.hashed_password) is True
+
+        # Reset back for clean state
+        reset_platform_owner_password("owner@industrace.ai", "PlatformOwner2026!", db=db)
+    finally:
+        db.close()
+
+
+
+def test_three_independent_registrations_and_logins_and_bad_password(client):
+    """
+    Tests at least three independent registrations and logins, including a third account
+    and verification that an incorrect password returns 401.
+    """
+    accounts = [
+        {
+            "company_name": "Alpha Precision Machining",
+            "industry": "Precision Engineering",
+            "full_name": "Alpha User",
+            "email": "alpha_test_user@precision.com",
+            "password": "PasswordAlpha123!"
+        },
+        {
+            "company_name": "Beta Aerospace Dynamics",
+            "industry": "Aerospace Components",
+            "full_name": "Beta User",
+            "email": "beta_test_user@aerospace.com",
+            "password": "PasswordBeta123!"
+        },
+        {
+            "company_name": "Gamma Metallurgy Labs",
+            "industry": "Alloy Casting",
+            "full_name": "Gamma User",
+            "email": "gamma_test_user@metallurgy.com",
+            "password": "PasswordGamma123!"
+        }
+    ]
+
+    tokens = []
+    # 1. Register all three accounts
+    for acc in accounts:
+        res = client.post("/api/auth/register-company", json=acc)
+        assert res.status_code == 200, f"Registration failed for {acc['email']}: {res.text}"
+        tokens.append(res.json()["token"])
+
+    # 2. Login to all three accounts independently
+    for acc in accounts:
+        res = client.post("/api/auth/login", json={
+            "email": acc["email"],
+            "password": acc["password"]
+        })
+        assert res.status_code == 200, f"Login failed for {acc['email']}: {res.text}"
+        data = res.json()
+        assert data["user"]["email"] == acc["email"]
+        assert "token" in data
+
+    # 3. Test wrong password for third account -> 401
+    bad_res = client.post("/api/auth/login", json={
+        "email": accounts[2]["email"],
+        "password": "CompletelyWrongPassword!"
+    })
+    assert bad_res.status_code == 401
+    assert "Invalid email address or password." in bad_res.json()["detail"]
+
+    # 4. Test nonexistent email -> 401
+    missing_res = client.post("/api/auth/login", json={
+        "email": "does_not_exist@industrace.ai",
+        "password": "Password123!"
+    })
+    assert missing_res.status_code == 401
+    assert "Invalid email address or password." in missing_res.json()["detail"]
+
+
+def test_platform_owner_login_and_role_protection(client):
+    """
+    Tests that a valid owner can log in, an invalid password is rejected,
+    and protected owner endpoints enforce the owner role.
+    """
+    # Valid owner login
+    res = client.post("/api/auth/login", json={
+        "email": "owner@industrace.ai",
+        "password": "PlatformOwner2026!"
+    })
+    assert res.status_code == 200
+    owner_token = res.json()["token"]
+    assert res.json()["user"]["role"] == "platform_owner"
+
+    # Owner can access protected endpoint
+    owner_headers = {"Authorization": f"Bearer {owner_token}"}
+    ov_res = client.get("/api/platform/overview", headers=owner_headers)
+    assert ov_res.status_code == 200
+
+    # Invalid password is rejected
+    bad_res = client.post("/api/auth/login", json={
+        "email": "owner@industrace.ai",
+        "password": "WrongOwnerPassword123"
+    })
+    assert bad_res.status_code == 401
+
+    # Regular user cannot access protected owner endpoint
+    reg_user = client.post("/api/auth/login", json={
+        "email": "alpha_test_user@precision.com",
+        "password": "PasswordAlpha123!"
+    })
+    assert reg_user.status_code == 200
+    reg_headers = {"Authorization": f"Bearer {reg_user.json()['token']}"}
+
+    forbidden_res = client.get("/api/platform/overview", headers=reg_headers)
+    assert forbidden_res.status_code == 403
+
+
+def test_database_persistence_with_fresh_session(client):
+    """
+    Registers a company, creates two waste streams, retrieves them from a fresh
+    database session, and verifies that the records still exist in the database.
+    """
+    reg_res = client.post("/api/auth/register-company", json={
+        "company_name": "Persistence Verification Foundry",
+        "industry": "Ferrous Casting",
+        "full_name": "Kishore Patil",
+        "email": "kishore@persistencefoundry.com",
+        "password": "PersistPassword2026!"
+    })
+    assert reg_res.status_code == 200
+    token = reg_res.json()["token"]
+    comp_id = reg_res.json()["company"]["id"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # Create stream 1
+    s1_res = client.post("/api/waste-streams", json={
+        "stream_name": "Iron Foundry Cupola Slag",
+        "waste_category": "Slags & Drosses",
+        "generating_process": "Cupola Melting",
+        "quantity": 5000.0,
+        "quantity_unit": "kg/month"
+    }, headers=headers)
+    assert s1_res.status_code == 200
+    s1_id = s1_res.json()["id"]
+
+    # Create stream 2
+    s2_res = client.post("/api/waste-streams", json={
+        "stream_name": "Green Sand Casting Residue",
+        "waste_category": "Foundry Sand",
+        "generating_process": "Mould Shakeout",
+        "quantity": 3200.0,
+        "quantity_unit": "kg/month"
+    }, headers=headers)
+    assert s2_res.status_code == 200
+    s2_id = s2_res.json()["id"]
+
+    # Retrieve from fresh DB session
+    fresh_db = TestingSessionLocal()
+    try:
+        streams = fresh_db.query(WasteStream).filter(WasteStream.company_id == comp_id).all()
+        assert len(streams) == 2
+        stream_ids = [s.id for s in streams]
+        assert s1_id in stream_ids
+        assert s2_id in stream_ids
+
+        # Verify fields
+        slag_stream = next(s for s in streams if s.id == s1_id)
+        assert slag_stream.stream_name == "Iron Foundry Cupola Slag"
+        assert slag_stream.quantity == 5000.0
+    finally:
+        fresh_db.close()
+
+
+def test_dashboard_statistics_calculations(client):
+    """
+    Verifies dashboard statistics logic:
+    - Company with 0 streams shows 0 counts
+    - Company with streams but no lab assays shows exact awaiting count
+    - Adding verified lab results reduces awaiting count
+    - Category chart counts match total streams
+    """
+    reg_res = client.post("/api/auth/register-company", json={
+        "company_name": "Metric Calculation Corp",
+        "industry": "Electronics Recycling",
+        "full_name": "Metrics Admin",
+        "email": "admin@metriccalculation.com",
+        "password": "MetricPassword2026!"
+    })
+    assert reg_res.status_code == 200
+    token = reg_res.json()["token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # 1. Zero streams initially
+    dash0 = client.get("/api/dashboard/summary", headers=headers)
+    assert dash0.status_code == 200
+    d0 = dash0.json()
+    assert d0["waste_streams_count"] == 0
+    assert d0["awaiting_investigation_count"] == 0
+    assert d0["potentially_recoverable_count"] == 0
+    assert d0["category_distribution"] == []
+
+    # 2. Add 1 stream with no lab results
+    s_res = client.post("/api/waste-streams", json={
+        "stream_name": "Printed Circuit Board Trimmings",
+        "waste_category": "Electronic Scrap",
+        "generating_process": "PCB Routing & Depaneling",
+        "quantity": 150.0,
+        "quantity_unit": "kg/month"
+    }, headers=headers)
+    assert s_res.status_code == 200
+    stream_id = s_res.json()["id"]
+
+    dash1 = client.get("/api/dashboard/summary", headers=headers)
+    assert dash1.status_code == 200
+    d1 = dash1.json()
+    assert d1["waste_streams_count"] == 1
+    assert d1["awaiting_investigation_count"] == 1, "Stream with 0 lab tests must count as awaiting investigation"
+    assert len(d1["category_distribution"]) == 1
+    assert sum(c["value"] for c in d1["category_distribution"]) == 1
+    assert d1["next_recommended_action"] is not None
+
+    # 3. Add 3 verified lab assay parameters
+    for param, val, unit in [("Copper (Cu)", "28.5", "wt%"), ("Gold (Au)", "120.0", "ppm"), ("Silver (Ag)", "450.0", "ppm")]:
+        lab_res = client.post("/api/lab-results", json={
+            "waste_stream_id": stream_id,
+            "sample_id": "PCB-001",
+            "sample_date": "2026-10-23",
+            "laboratory": "Accredited Precious Metals Assay Lab",
+            "test_name": "Fire Assay / ICP-OES",
+            "measured_parameter": param,
+            "result_value_str": val,
+            "unit": unit,
+            "detection_limit": "0.01"
+        }, headers=headers)
+        assert lab_res.status_code == 200
+
+    dash2 = client.get("/api/dashboard/summary", headers=headers)
+    assert dash2.status_code == 200
+    d2 = dash2.json()
+    assert d2["awaiting_investigation_count"] == 0, "Stream with complete verified assay should have 0 pending tests"
+
+
+def test_pdf_report_types_distinct_content(client, benchmark_info):
+    """
+    Verifies that each report type (Executive, Technical, Recommendations)
+    produces a valid PDF file with distinct content matching its purpose.
+    """
+    headers = {"Authorization": f"Bearer {benchmark_info['token']}"}
+    stream_id = benchmark_info["stream_id"]
+
+    # 1. Executive Summary PDF
+    exec_res = client.get(f"/api/reports/pdf/executive/{stream_id}", headers=headers)
+    assert exec_res.status_code == 200
+    assert exec_res.headers["content-type"] == "application/pdf"
+    assert exec_res.content.startswith(b"%PDF-")
+    assert len(exec_res.content) > 1000
+
+    # 2. Technical Report PDF
+    tech_res = client.get(f"/api/reports/pdf/technical/{stream_id}", headers=headers)
+    assert tech_res.status_code == 200
+    assert tech_res.headers["content-type"] == "application/pdf"
+    assert tech_res.content.startswith(b"%PDF-")
+    assert len(tech_res.content) > 1000
+
+    # 3. Recommendations PDF
+    rec_res = client.get(f"/api/reports/pdf/recommendations/{stream_id}", headers=headers)
+    assert rec_res.status_code == 200
+    assert rec_res.headers["content-type"] == "application/pdf"
+    assert rec_res.content.startswith(b"%PDF-")
+    assert len(rec_res.content) > 1000

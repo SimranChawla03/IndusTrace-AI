@@ -160,7 +160,7 @@ export const PlatformOwnerPage: React.FC = () => {
                 <div className="mt-3">
                   <span className="text-3xl font-bold text-[#202C25]">{overview.total_users}</span>
                   <p className="text-[11px] text-[#778279] mt-1">
-                    {overview.users_by_role['platform_owner'] || 0} platform owners
+                    <span className="text-[#26734D] font-medium">{overview.production_users ?? overview.total_users} production</span> • {overview.users_by_role['platform_owner'] || 0} owners
                   </p>
                 </div>
               </div>
@@ -172,7 +172,9 @@ export const PlatformOwnerPage: React.FC = () => {
                 </div>
                 <div className="mt-3">
                   <span className="text-3xl font-bold text-[#202C25]">{overview.total_waste_streams}</span>
-                  <p className="text-[11px] text-[#778279] mt-1">Across {overview.total_facilities} facilities</p>
+                  <p className="text-[11px] text-[#778279] mt-1">
+                    <span className="text-[#26734D] font-medium">{overview.production_waste_streams ?? 0} production</span> • {overview.total_facilities} facilities
+                  </p>
                 </div>
               </div>
 
@@ -187,7 +189,9 @@ export const PlatformOwnerPage: React.FC = () => {
                       ? `${(overview.total_monthly_volume_kg / 1000).toFixed(1)} t`
                       : `${overview.total_monthly_volume_kg.toFixed(0)} kg`}
                   </span>
-                  <p className="text-[11px] text-[#778279] mt-1">Aggregated waste mass</p>
+                  <p className="text-[11px] text-[#778279] mt-1">
+                    Production: {(overview.production_monthly_volume_kg || 0) >= 1000 ? `${((overview.production_monthly_volume_kg || 0) / 1000).toFixed(1)} t` : `${(overview.production_monthly_volume_kg || 0).toFixed(0)} kg`}
+                  </p>
                 </div>
               </div>
 
@@ -198,7 +202,9 @@ export const PlatformOwnerPage: React.FC = () => {
                 </div>
                 <div className="mt-3">
                   <span className="text-3xl font-bold text-[#202C25]">{overview.total_assessments}</span>
-                  <p className="text-[11px] text-[#778279] mt-1">Evaluations logged</p>
+                  <p className="text-[11px] text-[#778279] mt-1">
+                    <span className="text-[#26734D] font-medium">{overview.production_assessments ?? 0} production</span> evaluations
+                  </p>
                 </div>
               </div>
 
@@ -209,10 +215,34 @@ export const PlatformOwnerPage: React.FC = () => {
                 </div>
                 <div className="mt-3">
                   <span className="text-3xl font-bold text-[#202C25]">{overview.total_recovery_scenarios}</span>
-                  <p className="text-[11px] text-[#778279] mt-1">Circular models</p>
+                  <p className="text-[11px] text-[#778279] mt-1">
+                    <span className="text-[#26734D] font-medium">{overview.production_recovery_scenarios ?? 0} production</span> circular models
+                  </p>
                 </div>
               </div>
             </div>
+
+            {/* Registration Trends Panel */}
+            {overview.registration_trends && overview.registration_trends.length > 0 && (
+              <div className="bg-white rounded-2xl p-5 border border-[#DCE5DA] shadow-xs">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-[15px] font-semibold text-[#202C25] flex items-center gap-2">
+                    <TrendingUp className="w-4 h-4 text-[#26734D]" />
+                    <span>Monthly Registration Trends (Audit Track)</span>
+                  </h3>
+                  <span className="text-xs text-[#778279]">Past 6 Months</span>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
+                  {overview.registration_trends.map((trend, idx) => (
+                    <div key={idx} className="bg-[#F7F8F3] border border-[#DCE5DA] rounded-xl p-3 text-center">
+                      <div className="text-[11px] font-semibold text-[#56645A] uppercase">{trend.month}</div>
+                      <div className="text-2xl font-bold text-[#26734D] mt-1">{trend.registrations}</div>
+                      <div className="text-[10px] text-[#778279] mt-0.5">new organizations</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Company Directory Section */}
             <div className="bg-white rounded-2xl border border-[#DCE5DA] shadow-xs overflow-hidden">
@@ -267,12 +297,12 @@ export const PlatformOwnerPage: React.FC = () => {
                         <td className="py-4 px-6">
                           <div className="font-semibold text-[#202C25]">{co.name}</div>
                           <div className="text-[11px] text-[#778279] mt-0.5 flex items-center gap-1.5">
-                            <span>ID #{co.id}</span>
+                            <span>Tenant ID #{co.id}</span>
                             <span>•</span>
-                            <span>{co.email || 'No email registered'}</span>
+                            <span className="font-mono text-[#56645A]">Protected Privacy Mode</span>
                             <span>•</span>
                             <span className={co.data_origin === 'USER_REGISTERED' ? 'text-[#26734D] font-medium' : 'text-[#778279]'}>
-                              {co.data_origin || 'DEMO'}
+                              {co.data_origin === 'USER_REGISTERED' ? 'User Registered' : 'Synthetic Demo'}
                             </span>
                           </div>
                         </td>
@@ -386,77 +416,65 @@ export const PlatformOwnerPage: React.FC = () => {
                     {/* Confidentiality Reminder inside Modal */}
                     <div className="p-3 bg-[#EBF5EE] border border-[#C2E0C8] rounded-xl text-[12px] text-[#184E34] flex items-center gap-2">
                       <ShieldCheck className="w-4 h-4 flex-shrink-0 text-[#26734D]" />
-                      <span>Confidentiality Protected: Raw spectroscopy and lab assays are not exposed in Platform Owner view.</span>
+                      <span>{companyDetail.privacy_notice || 'Confidentiality Protected: Raw spectroscopy, user emails, and assays are strictly quarantined from Platform Owner view.'}</span>
                     </div>
 
-                    {/* Operational Facilities */}
-                    <div>
-                      <h4 className="text-[13px] font-semibold text-[#202C25] mb-2 uppercase tracking-wide">
-                        Facilities ({companyDetail.facilities.length})
-                      </h4>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        {companyDetail.facilities.map((f) => (
-                          <div key={f.id} className="p-3.5 bg-[#F7F8F3] rounded-xl border border-[#DCE5DA]">
-                            <div className="font-semibold text-[13px] text-[#202C25]">{f.name}</div>
-                            <div className="text-[11px] text-[#56645A] mt-0.5">{f.primary_process}</div>
-                            <div className="text-[10px] text-[#778279] mt-1">{f.location || 'Plant Location'}</div>
-                          </div>
-                        ))}
+                    {/* Operational Facilities Aggregate */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      <div className="p-3.5 bg-[#F7F8F3] rounded-xl border border-[#DCE5DA] text-center">
+                        <div className="text-[11px] text-[#56645A] uppercase font-semibold">Facilities</div>
+                        <div className="text-2xl font-bold text-[#202C25] mt-1">{companyDetail.facilities_count}</div>
+                        <div className="text-[10px] text-[#778279] mt-0.5">Operating Sites</div>
+                      </div>
+                      <div className="p-3.5 bg-[#F7F8F3] rounded-xl border border-[#DCE5DA] text-center">
+                        <div className="text-[11px] text-[#56645A] uppercase font-semibold">Waste Streams</div>
+                        <div className="text-2xl font-bold text-[#202C25] mt-1">{companyDetail.waste_streams_count}</div>
+                        <div className="text-[10px] text-[#778279] mt-0.5">Tracked Streams</div>
+                      </div>
+                      <div className="p-3.5 bg-[#F7F8F3] rounded-xl border border-[#DCE5DA] text-center">
+                        <div className="text-[11px] text-[#56645A] uppercase font-semibold">Assessments</div>
+                        <div className="text-2xl font-bold text-[#202C25] mt-1">{companyDetail.assessments_count}</div>
+                        <div className="text-[10px] text-[#778279] mt-0.5">TWS Evaluations</div>
+                      </div>
+                      <div className="p-3.5 bg-[#F7F8F3] rounded-xl border border-[#DCE5DA] text-center">
+                        <div className="text-[11px] text-[#56645A] uppercase font-semibold">Scenarios</div>
+                        <div className="text-2xl font-bold text-[#202C25] mt-1">{companyDetail.recovery_scenarios_count}</div>
+                        <div className="text-[10px] text-[#778279] mt-0.5">Circular Models</div>
                       </div>
                     </div>
 
-                    {/* Waste Streams Summary */}
+                    {/* Stream Categories Aggregate Breakdown */}
                     <div>
                       <h4 className="text-[13px] font-semibold text-[#202C25] mb-2 uppercase tracking-wide">
-                        Waste Streams ({companyDetail.waste_streams_summary.length})
+                        Material Category Distribution (Anonymized)
                       </h4>
-                      {companyDetail.waste_streams_summary.length === 0 ? (
+                      {Object.keys(companyDetail.stream_categories || {}).length === 0 ? (
                         <p className="text-xs text-[#778279] italic p-3 bg-[#F7F8F3] rounded-xl border border-[#DCE5DA]">
                           No waste streams registered yet for this workspace.
                         </p>
                       ) : (
-                        <div className="space-y-2">
-                          {companyDetail.waste_streams_summary.map((st) => (
-                            <div key={st.id} className="p-3.5 bg-[#F7F8F3] rounded-xl border border-[#DCE5DA] flex items-center justify-between">
-                              <div>
-                                <span className="font-semibold text-[13px] text-[#202C25]">{st.stream_name}</span>
-                                <div className="text-[11px] text-[#56645A] mt-0.5">
-                                  {st.waste_category} • {st.quantity} {st.quantity_unit} • {st.facility_name}
-                                </div>
-                              </div>
-                              <div className="text-right flex items-center gap-2">
-                                <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${
-                                  st.priority_level === 'High' 
-                                    ? 'bg-[#FDECEC] text-[#A42D2D] border border-[#F5C2C2]' 
-                                    : 'bg-[#E5EEE3] text-[#26734D] border border-[#C2D8C4]'
-                                }`}>
-                                  {st.priority_level} (TWS {st.tws_score !== null ? st.tws_score : '—'})
-                                </span>
-                              </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {Object.entries(companyDetail.stream_categories).map(([cat, count]) => (
+                            <div key={cat} className="p-3 bg-[#F7F8F3] rounded-xl border border-[#DCE5DA] flex items-center justify-between text-xs">
+                              <span className="font-medium text-[#202C25]">{cat}</span>
+                              <span className="font-semibold text-[#26734D] bg-[#E5EEE3] px-2.5 py-0.5 rounded-full border border-[#C2D8C4]">
+                                {count} {count === 1 ? 'stream' : 'streams'}
+                              </span>
                             </div>
                           ))}
                         </div>
                       )}
                     </div>
 
-                    {/* Account Users */}
-                    <div>
-                      <h4 className="text-[13px] font-semibold text-[#202C25] mb-2 uppercase tracking-wide">
-                        Authorized Users ({companyDetail.users.length})
-                      </h4>
-                      <div className="space-y-2">
-                        {companyDetail.users.map((u) => (
-                          <div key={u.id} className="p-3 bg-[#F7F8F3] rounded-xl border border-[#DCE5DA] flex items-center justify-between text-[12px]">
-                            <div>
-                              <span className="font-semibold text-[#202C25]">{u.full_name}</span>
-                              <span className="text-[#778279] ml-2">({u.email})</span>
-                            </div>
-                            <span className="text-[11px] bg-white px-2 py-0.5 rounded border border-[#DCE5DA] font-medium text-[#56645A]">
-                              {u.role}
-                            </span>
-                          </div>
-                        ))}
+                    {/* Compliance & Isolation Notice */}
+                    <div className="p-4 bg-[#F7F8F3] rounded-xl border border-[#DCE5DA] text-xs text-[#56645A] space-y-1">
+                      <div className="font-semibold text-[#202C25] flex items-center gap-1.5">
+                        <Lock className="w-3.5 h-3.5 text-[#26734D]" />
+                        <span>Tenant Privacy Enforcement</span>
                       </div>
+                      <p>
+                        In accordance with enterprise confidentiality standards, proprietary plant locations, engineer identities, chemical assays, and trade secrets are never shared across tenants or platform owner views.
+                      </p>
                     </div>
                   </>
                 )}

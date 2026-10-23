@@ -11,18 +11,22 @@ def generate_recommendation(
     has_lab_results: bool
 ) -> RecommendationDetail:
     """
-    Generates rule-based, transparent, explainable recommendations adhering to scientific guardrails:
+    Generates rule-based, transparent, explainable recommendations adhering strictly to scientific guardrails:
     - Collect More Data
     - Conduct Laboratory Testing
     - Conduct Supplementary Laboratory Testing
     - Evaluate Recovery Feasibility
     - Evaluate Reuse
     - Evaluate Recycling
-    - Evaluate Treatment
+    - Evaluate Treatment / Effluent Compliance
     - Consider Authorized Disposal
+    Ensures wastewater and unverified streams never receive unjustified alloy recovery recommendations.
     """
     score = tws_data.get("tws_score", 0.0)
     priority = tws_data.get("priority_level", "Medium")
+    cat_lower = (stream.waste_category or "").lower()
+    stream_name_lower = (stream.stream_name or "").lower()
+    is_liquid_or_effluent = any(w in cat_lower or w in stream_name_lower for w in ["wastewater", "effluent", "rinse", "acid", "liquor", "solution"])
 
     supporting_evidence: List[str] = []
     for r in matched_rules[:3]:
@@ -48,8 +52,11 @@ def generate_recommendation(
 
     # 2. Comprehensive Laboratory Assays Recorded (>= 3 parameters)
     if lab_count >= 3:
-        cat_lower = (stream.waste_category or "").lower()
-        if any(term in cat_lower for term in ["sludge", "filter cake", "dust"]):
+        if is_liquid_or_effluent:
+            action = "Evaluate Effluent Treatment & Compliance"
+            reason = f"Multi-parameter laboratory profile recorded ({lab_count} parameters); evaluate chemical neutralization, precipitation, or Zero Liquid Discharge (ZLD) feasibility against statutory discharge standards."
+            suggested_next_step = "Compare measured dissolved contaminants against regional Pollution Control Board effluent discharge thresholds."
+        elif any(term in cat_lower for term in ["sludge", "filter cake", "dust"]):
             action = "Evaluate Recovery Feasibility"
             reason = f"Multi-element laboratory assays on file ({lab_count} parameters); evaluate hydrometallurgical extraction or thermal concentration against hazardous treatment costs."
             suggested_next_step = "Run Recovery & Economic Analysis using verified elemental percentages to model net recovery viability."
@@ -59,14 +66,14 @@ def generate_recommendation(
             suggested_next_step = "Conduct pilot test melt to verify tramp element tolerance and ingot mechanical properties."
         else:
             action = "Evaluate Treatment"
-            reason = f"Laboratory assay matrix recorded ({lab_count} parameters); verify effluent/discharge compliance thresholds against statutory environmental limits."
-            suggested_next_step = "Compare measured concentrations against regional pollution control board disposal thresholds."
+            reason = f"Laboratory assay matrix recorded ({lab_count} parameters); verify industrial treatment options and statutory environmental compliance."
+            suggested_next_step = "Review regional environmental standards and consult accredited treatment facility."
 
         return RecommendationDetail(
             action=action,
             priority="High" if score >= 65 else "Medium",
             reason=reason,
-            supporting_evidence=supporting_evidence or [f"{lab_count} verified laboratory assays recorded in IndusTrace."],
+            supporting_evidence=supporting_evidence or [f"{lab_count} laboratory assay(s) recorded in IndusTrace."],
             missing_information=missing_info,
             limitations="Laboratory assays represent specific sampled batches; variation across production cycles requires ongoing quality control.",
             suggested_next_step=suggested_next_step
@@ -74,39 +81,56 @@ def generate_recommendation(
 
     # 3. Partial Laboratory Assays Recorded (1 - 2 parameters)
     if lab_count > 0:
+        if is_liquid_or_effluent:
+            reason = f"Partial assay on file ({lab_count} parameter(s)), but complete effluent matrix (pH, COD/BOD, dissolved heavy metals) remains unverified."
+            next_step = "Submit composite effluent sample for comprehensive multi-parameter environmental analysis (pH, TDS, TSS, heavy metals)."
+        else:
+            reason = f"Partial laboratory profile on file ({lab_count} parameter(s)), but complete elemental matrix and tramp contaminant thresholds remain unverified."
+            next_step = "Commission multi-element ICP-OES or XRF spectrometry to establish complete chemical matrix before authorizing commercial recovery."
+
         return RecommendationDetail(
             action="Conduct Supplementary Laboratory Testing",
             priority="High" if score >= 60 else "Medium",
-            reason=f"Partial laboratory profile on file ({lab_count} parameter(s)), but complete elemental matrix and tramp contaminant thresholds remain unverified.",
+            reason=reason,
             supporting_evidence=supporting_evidence or ["Preliminary screening assay exists, but full characterization is pending."],
             missing_information=missing_info,
-            limitations="A single measured analyte does not guarantee alloy compatibility or the absence of hazardous tramp elements.",
-            suggested_next_step="Commission multi-element ICP-OES or XRF spectrometry to establish complete chemical matrix before authorizing commercial recovery."
+            limitations="A single measured analyte does not guarantee alloy compatibility or absence of hazardous contaminants.",
+            suggested_next_step=next_step
         )
 
     # 4. No Laboratory Assays Recorded: High TWS Urgency (>= 70)
     if score >= 70.0:
+        if is_liquid_or_effluent:
+            reason = f"High Test Worthiness Score ({score:.1f}/100) indicates substantial liquid effluent volume with uncharacterized chemical contaminants."
+            next_step = "Procure representative effluent grab and composite samples; submit for accredited environmental assay (heavy metals, pH, COD/BOD)."
+        else:
+            reason = f"High Test Worthiness Score ({score:.1f}/100) indicates substantial volume and critical compositional information deficit."
+            next_step = "Procure representative production sample, submit for accredited elemental assay (ICP-OES / XRF), and record results in Laboratory module."
+
         return RecommendationDetail(
             action="Conduct Laboratory Testing",
             priority="High",
-            reason=f"High Test Worthiness Score ({score:.1f}/100) indicates substantial volume and critical compositional information deficit.",
+            reason=reason,
             supporting_evidence=supporting_evidence or ["High volume throughput with substantial uncertainty regarding valuable or hazardous constituents."],
             missing_information=missing_info,
             limitations="Research literature indicates potential valorization or treatment constraints, but exact chemical composition requires certified physical assays.",
-            suggested_next_step="Procure representative production sample, submit for accredited elemental assay (ICP-OES / XRF), and record results in Laboratory module."
+            suggested_next_step=next_step
         )
 
     # 5. No Laboratory Assays Recorded: Moderate TWS (50 - 69.9)
     if score >= 50.0:
-        cat_lower = (stream.waste_category or "").lower()
-        if "chips" in cat_lower or "swarf" in cat_lower:
+        if is_liquid_or_effluent:
+            action = "Conduct Laboratory Testing"
+            reason = f"Moderate investigation priority ({score:.1f}/100); screening-level chemical assay recommended to establish wastewater neutralization or treatment pathway."
+            next_step = "Run benchtop pH and heavy metal screening to assess neutralization and coagulation requirements."
+        elif "chips" in cat_lower or "swarf" in cat_lower:
             action = "Evaluate Reuse"
             reason = f"Moderate investigation score ({score:.1f}/100); evaluate shop-floor briquetting and cutting fluid centrifuge recovery prior to external smelting."
             next_step = "Measure residual cutting fluid moisture content to evaluate mechanical briquetting feasibility."
         else:
             action = "Conduct Laboratory Testing"
             reason = f"Moderate investigation priority ({score:.1f}/100); screening-level chemical assay recommended to resolve recovery or disposal pathway."
-            next_step = "Run single-analyte or rapid XRF screening for primary suspect metal or hazardous component."
+            next_step = "Run single-analyte or rapid screening for primary suspect constituent or hazardous contaminant."
 
         return RecommendationDetail(
             action=action,

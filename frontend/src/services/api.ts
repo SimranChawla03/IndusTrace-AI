@@ -138,17 +138,29 @@ export interface LabResult {
   created_at: string;
 }
 
+export interface RegistrationTrend {
+  month: string;
+  registrations: number;
+}
+
 export interface PlatformOverview {
   total_companies: number;
   registered_companies: number;
   demo_companies: number;
   total_users: number;
-  users_by_role: Record<string, number>;
+  production_users: number;
   total_facilities: number;
+  production_facilities: number;
   total_waste_streams: number;
+  production_waste_streams: number;
   total_assessments: number;
+  production_assessments: number;
   total_recovery_scenarios: number;
+  production_recovery_scenarios: number;
   total_monthly_volume_kg: number;
+  production_monthly_volume_kg: number;
+  users_by_role: Record<string, number>;
+  registration_trends?: RegistrationTrend[];
   recent_activity: Array<{
     id: string;
     type: string;
@@ -169,30 +181,20 @@ export interface PlatformCompanySummary {
   created_at?: string;
   data_origin?: string;
   user_count: number;
-  facility_count: number;
+  facility_count?: number;
   waste_stream_count: number;
   total_monthly_volume_kg: number;
   high_priority_streams_count: number;
 }
 
 export interface PlatformCompanyDetail {
-  company: Company;
-  users: User[];
-  facilities: Facility[];
-  waste_streams_summary: Array<{
-    id: number;
-    stream_name: string;
-    waste_category: string;
-    physical_form: string;
-    quantity: number;
-    quantity_unit: string;
-    facility_name: string;
-    has_lab_results: boolean;
-    tws_score?: number;
-    priority_level: string;
-    recommendation: string;
-  }>;
+  company: PlatformCompanySummary;
+  facilities_count: number;
+  waste_streams_count: number;
+  stream_categories: Record<string, number>;
+  assessments_count: number;
   recovery_scenarios_count: number;
+  privacy_notice: string;
 }
 
 export interface DashboardSummary {
@@ -205,6 +207,15 @@ export interface DashboardSummary {
   category_distribution: { name: string; value: number }[];
   priority_distribution: { priority: string; count: number }[];
   recent_activity: { id: string; type: string; title: string; subtitle: string; date: string }[];
+  next_recommended_action?: {
+    action: string;
+    stream_name?: string;
+    category?: string;
+    reason: string;
+    suggested_next_step: string;
+    priority: string;
+    evidence_status: string;
+  };
 }
 
 export interface RecoveryScenario {

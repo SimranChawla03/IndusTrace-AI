@@ -1,7 +1,7 @@
 # backend/app/models/schemas.py
 from datetime import datetime
 from typing import List, Optional, Dict, Any
-from pydantic import BaseModel, Field, EmailStr
+from pydantic import BaseModel, Field, EmailStr, ConfigDict
 
 # --- Auth & User Schemas ---
 class UserLogin(BaseModel):
@@ -15,15 +15,14 @@ class UserCreate(BaseModel):
     role: Optional[str] = "admin"
 
 class UserResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     company_id: int
     email: str
     full_name: str
     role: str
     created_at: datetime
-
-    class Config:
-        from_attributes = True
 
 class AuthResponse(BaseModel):
     token: str
@@ -56,13 +55,12 @@ class FacilityCreate(FacilityBase):
     company_id: Optional[int] = None
 
 class FacilityResponse(FacilityBase):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     company_id: int
     waste_stream_count: Optional[int] = 0
     created_at: datetime
-
-    class Config:
-        from_attributes = True
 
 
 # --- Company Schemas ---
@@ -90,12 +88,11 @@ class CompanyUpdate(BaseModel):
     process_description: Optional[str] = None
 
 class CompanyResponse(CompanyBase):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     data_origin: str
     created_at: datetime
-
-    class Config:
-        from_attributes = True
 
 
 # --- Waste Stream Schemas ---
@@ -129,14 +126,13 @@ class WasteStreamUpdate(BaseModel):
     recovery_info: Optional[str] = None
 
 class WasteStreamResponse(WasteStreamBase):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     company_id: int
     facility_name: Optional[str] = None
     data_origin: str
     created_at: datetime
-
-    class Config:
-        from_attributes = True
 
 
 # --- Lab Result Schemas ---
@@ -146,7 +142,7 @@ class LabResultBase(BaseModel):
     laboratory: Optional[str] = None
     test_name: str
     measured_parameter: str
-    result_value_str: str  # Allows qualifiers like '<0.03', 'ND', 'bal.', '28.4'
+    result_value_str: str  # Preserves qualifiers: '<0.03', 'ND', 'bal.', '28.4'
     unit: Optional[str] = None
     detection_limit: Optional[str] = None
     test_method: Optional[str] = None
@@ -157,19 +153,20 @@ class LabResultCreate(LabResultBase):
     result_value_numeric: Optional[float] = None
 
 class LabResultResponse(LabResultBase):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
-    waste_stream_id: Optional[int]
+    waste_stream_id: Optional[int] = None
     stream_name: Optional[str] = None
-    result_value_numeric: Optional[float]
+    result_value_numeric: Optional[float] = None
     data_origin: str
     created_at: datetime
-
-    class Config:
-        from_attributes = True
 
 
 # --- WIR & Research Source Schemas ---
 class WIRRuleResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: str
     waste_stream: str
     investigation_area: str
@@ -182,10 +179,9 @@ class WIRRuleResponse(BaseModel):
     evidence_confidence: Optional[str] = None
     limitations: Optional[str] = None
 
-    class Config:
-        from_attributes = True
-
 class ResearchSourceResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     source_id: str
     title: str
     authors: Optional[str] = None
@@ -196,9 +192,6 @@ class ResearchSourceResponse(BaseModel):
     scope: Optional[str] = None
     relevant_summary: Optional[str] = None
     caveat: Optional[str] = None
-
-    class Config:
-        from_attributes = True
 
 
 # --- Assessment & Recommendation Schemas ---
@@ -221,6 +214,8 @@ class RecommendationDetail(BaseModel):
     suggested_next_step: str
 
 class AssessmentResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     waste_stream_id: int
     stream_name: str
@@ -234,9 +229,6 @@ class AssessmentResponse(BaseModel):
     recommendation_details: RecommendationDetail
     scoring_version: str
     created_at: datetime
-
-    class Config:
-        from_attributes = True
 
 
 # --- Recovery & Economics Schemas ---
@@ -255,6 +247,8 @@ class RecoveryCalculationRequest(BaseModel):
     notes: Optional[str] = None
 
 class RecoveryScenarioResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     waste_stream_id: int
     target_material: str
@@ -275,9 +269,6 @@ class RecoveryScenarioResponse(BaseModel):
     notes: Optional[str]
     created_at: datetime
 
-    class Config:
-        from_attributes = True
-
 
 # --- Dashboard Summary Schema ---
 class DashboardSummary(BaseModel):
@@ -290,25 +281,37 @@ class DashboardSummary(BaseModel):
     category_distribution: List[Dict[str, Any]]
     priority_distribution: List[Dict[str, Any]]
     recent_activity: List[Dict[str, Any]]
+    next_recommended_action: Optional[Dict[str, Any]] = None
 
 
 # --- Platform Owner Governance Schemas ---
 class PlatformOverviewResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     total_companies: int
     registered_companies: int
     demo_companies: int
     total_users: int
+    production_users: int = 0
     users_by_role: Dict[str, int]
     total_facilities: int
+    production_facilities: int = 0
     total_waste_streams: int
+    production_waste_streams: int = 0
     total_assessments: int
+    production_assessments: int = 0
     total_recovery_scenarios: int
+    production_recovery_scenarios: int = 0
     total_monthly_volume_kg: float
+    production_monthly_volume_kg: float = 0.0
+    registration_trends: List[Dict[str, Any]] = []
     recent_activity: List[Dict[str, Any]]
 
 class PlatformCompanySummary(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
-    name: str
+    name: str  # Masked/anonymized tenant identifier for privacy
     industry: str
     location: Optional[str] = None
     email: Optional[str] = None
@@ -322,9 +325,15 @@ class PlatformCompanySummary(BaseModel):
     high_priority_streams_count: int
 
 class PlatformCompanyDetail(BaseModel):
-    company: CompanyResponse
-    users: List[UserResponse]
-    facilities: List[FacilityResponse]
-    waste_streams_summary: List[Dict[str, Any]]
-    recovery_scenarios_count: int
+    model_config = ConfigDict(from_attributes=True)
 
+    company: CompanyResponse
+    users: List[UserResponse] = []
+    facilities: List[FacilityResponse] = []
+    facilities_count: int = 0
+    waste_streams_count: int = 0
+    stream_categories: Dict[str, int] = {}
+    waste_streams_summary: List[Dict[str, Any]] = []
+    assessments_count: int = 0
+    recovery_scenarios_count: int = 0
+    privacy_notice: str = "Confidentiality Protected: Raw spectroscopy, chemical assays, and trade secrets are strictly quarantined within each tenant's isolated workspace."
